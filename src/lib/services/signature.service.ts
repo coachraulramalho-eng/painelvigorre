@@ -3,26 +3,28 @@ import { randomUUID } from 'crypto';
 import { createHash } from 'crypto';
 
 // ========== TIPOS ==========
-interface SignatureRequest {
+export interface SignatureRequest {
   id: string;
   documentId: string;
   documentTitle: string;
   signerName: string;
   signerEmail: string;
-  signerPhone?: string;
+  signerPhone: string | null;
   status: 'pending' | 'viewed' | 'signed' | 'declined' | 'expired' | 'cancelled';
-  signatureData?: string;
-  signatureDate?: Date;
+  signatureData: string | null;
+  signatureDate: Date | null;
   token: string;
-  ipAddress?: string;
-  userAgent?: string;
-  notes?: string;
-  expiresAt?: Date;
+  ipAddress: string | null;
+  userAgent: string | null;
+  notes: string | null;
+  expiresAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
+  document?: any;
+  fields?: SignatureField[];
 }
 
-interface SignatureField {
+export interface SignatureField {
   id: string;
   documentId: string;
   name: string;
@@ -33,11 +35,13 @@ interface SignatureField {
   height: number;
   page: number;
   required: boolean;
-  value?: string;
+  value: string | null;
   signerId: string;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
-interface SignatureFieldInput {
+export interface SignatureFieldInput {
   name: string;
   type: 'signature' | 'initial' | 'date' | 'text' | 'checkbox' | 'radio';
   x: number;
@@ -57,7 +61,6 @@ export const createSignatureRequest = async (
 ): Promise<SignatureRequest[]> => {
   const requests: SignatureRequest[] = [];
 
-  // Verificar se documento existe
   const document = await prisma.document.findUnique({
     where: { id: documentId },
   });
@@ -78,12 +81,14 @@ export const createSignatureRequest = async (
         documentTitle: document.title,
         signerName: signer.name,
         signerEmail: signer.email,
-        signerPhone: signer.phone,
+        signerPhone: signer.phone || null,
         status: 'pending',
         expiresAt,
         token: generateSignatureToken(id, signer.email),
       },
     });
+
+    requests.push(request as SignatureRequest);
 
     // Registrar auditoria
     await prisma.auditLog.create({
@@ -95,8 +100,6 @@ export const createSignatureRequest = async (
         newData: { signer: signer.email, document: documentId },
       },
     });
-
-    requests.push(request);
 
     // Enviar notificação
     await prisma.notification.create({
@@ -138,25 +141,23 @@ export const validateSignatureToken = async (token: string): Promise<SignatureRe
     return null;
   }
 
-  // Verificar expiração
   if (request.expiresAt && new Date() > request.expiresAt) {
     await prisma.signatureRequest.update({
       where: { id: request.id },
       data: { status: 'expired' },
     });
-    return { ...request, status: 'expired' };
+    return { ...request, status: 'expired' } as SignatureRequest;
   }
 
-  return request;
+  return request as SignatureRequest;
 };
 
 // ========== PROCESSAMENTO DE ASSINATURA ==========
 export const processSignature = async (
   token: string,
-  signatureData: string, // Base64 da assinatura desenhada
+  signatureData: string,
   fields?: Array<{ id: string; value: string }>
 ): Promise<SignatureRequest | null> => {
-  // Verificar token
   const request = await prisma.signatureRequest.findFirst({
     where: { token },
   });
@@ -177,12 +178,10 @@ export const processSignature = async (
     throw new Error('Solicitação de assinatura expirada');
   }
 
-  // Validar assinatura (verificar se não está vazia)
   if (!signatureData || signatureData.length < 100) {
     throw new Error('Assinatura inválida ou muito curta');
   }
 
-  // Atualizar solicitação
   const updatedRequest = await prisma.signatureRequest.update({
     where: { id: request.id },
     data: {
@@ -192,7 +191,6 @@ export const processSignature = async (
     },
   });
 
-  // Processar campos preenchidos
   if (fields && fields.length > 0) {
     for (const field of fields) {
       await prisma.signatureField.update({
@@ -202,7 +200,6 @@ export const processSignature = async (
     }
   }
 
-  // Registrar auditoria
   await prisma.auditLog.create({
     data: {
       userId: 'system',
@@ -213,10 +210,9 @@ export const processSignature = async (
     },
   });
 
-  // Verificar se todos os signatários assinaram
   await checkAllSignatures(request.documentId);
 
-  return updatedRequest;
+  return updatedRequest as SignatureRequest;
 };
 
 // ========== VERIFICAÇÃO DE ASSINATURAS ==========
@@ -229,7 +225,6 @@ export const checkAllSignatures = async (documentId: string): Promise<boolean> =
   const anyDeclined = requests.some((r) => r.status === 'declined');
 
   if (allSigned) {
-    // Atualizar status do documento
     await prisma.document.update({
       where: { id: documentId },
       data: { 
@@ -238,7 +233,6 @@ export const checkAllSignatures = async (documentId: string): Promise<boolean> =
       },
     });
 
-    // Criar notificação
     await prisma.notification.create({
       data: {
         userId: 'system',
@@ -249,7 +243,6 @@ export const checkAllSignatures = async (documentId: string): Promise<boolean> =
       },
     });
 
-    // Registrar auditoria
     await prisma.auditLog.create({
       data: {
         userId: 'system',
@@ -264,7 +257,6 @@ export const checkAllSignatures = async (documentId: string): Promise<boolean> =
   }
 
   if (anyDeclined) {
-    // Atualizar status do documento
     await prisma.document.update({
       where: { id: documentId },
       data: { 
@@ -308,14 +300,13 @@ export const declineSignature = async (
     where: { id: request.id },
     data: {
       status: 'declined',
-      notes: reason,
+      notes: reason || null,
     },
   });
 
-  // Verificar se todos os signatários recusaram
   await checkAllSignatures(request.documentId);
 
-  return updatedRequest;
+  return updatedRequest as SignatureRequest;
 };
 
 // ========== VISUALIZAÇÃO ==========
@@ -349,14 +340,14 @@ export const createSignatureFields = async (
         signerId: field.signerId,
       },
     });
-    created.push(result);
+    created.push(result as SignatureField);
   }
 
   return created;
 };
 
 export const getSignatureFields = async (documentId: string): Promise<SignatureField[]> => {
-  return prisma.signatureField.findMany({
+  const fields = await prisma.signatureField.findMany({
     where: { documentId },
     orderBy: [
       { page: 'asc' },
@@ -364,16 +355,18 @@ export const getSignatureFields = async (documentId: string): Promise<SignatureF
       { x: 'asc' },
     ],
   });
+  return fields as SignatureField[];
 };
 
 export const updateSignatureField = async (
   fieldId: string,
   data: Partial<SignatureField>
 ): Promise<SignatureField | null> => {
-  return prisma.signatureField.update({
+  const field = await prisma.signatureField.update({
     where: { id: fieldId },
     data,
   });
+  return field as SignatureField | null;
 };
 
 export const deleteSignatureField = async (fieldId: string): Promise<boolean> => {
@@ -437,8 +430,6 @@ export const sendSignatureInvitationEmail = async (
     }
 
     const signatureUrl = `${process.env.NEXTAUTH_URL}/assinatura/${request.token}`;
-
-    // Aqui seria implementado o envio de e-mail real
     console.log(`📧 Enviando convite para ${request.signerEmail}: ${signatureUrl}`);
 
     return true;
