@@ -71,7 +71,7 @@ export const exportProposalsReport = async (filters?: any) => {
       proposal.number,
       proposal.company?.name || '',
       proposal.title,
-      formatCurrency(proposal.finalValue),
+      formatCurrency(Number(proposal.finalValue)),
       proposal.status,
       proposal.responsible?.name || '',
       formatDate(proposal.createdAt),
@@ -94,7 +94,7 @@ export const exportFinancialReport = async (filters?: any) => {
     rows: receivables.map(item => [
       item.company?.name || '',
       item.description,
-      formatCurrency(item.value),
+      formatCurrency(Number(item.value)),
       formatDate(item.dueDate),
       item.status,
       item.receivedAt ? formatDate(item.receivedAt) : '-',
@@ -121,7 +121,7 @@ export const exportRepresentativesReport = async (filters?: any) => {
       rep.type,
       rep.region || '',
       rep.status,
-      formatCurrency(rep.commissions.reduce((acc, c) => acc + c.value, 0)),
+      formatCurrency(rep.commissions.reduce((acc, c) => acc + Number(c.value), 0)),
       rep.commissions.length,
     ]),
   };
@@ -138,12 +138,21 @@ export const exportMarketingReport = async (filters?: any) => {
   return {
     filename: `relatorio-marketing-${formatDate(new Date())}`,
     headers: ['Campanha', 'Status', 'Leads Gerados', 'Conversões', 'ROI'],
-    rows: campaigns.map(campaign => ({
-      campaign: campaign.name,
-      status: campaign.status,
-      leads: campaign.leads.length,
-      // Conversões seriam calculadas com base em leads convertidos
-      // ROI seria calculado com base em receita gerada vs custo da campanha
-    })),
+    rows: campaigns.map(campaign => [
+      campaign.name,
+      campaign.status,
+      campaign.leads.length,
+      campaign.leads.filter(l => l.status === 'Convertido').length,
+      '0%', // Será calculado com dados reais futuramente
+    ]),
   };
+};
+
+// ========== FUNÇÃO AUXILIAR PARA CONVERTER DECIMAL ==========
+export const toNumber = (value: any): number => {
+  if (value === null || value === undefined) return 0;
+  if (typeof value === 'number') return value;
+  if (typeof value === 'string') return parseFloat(value) || 0;
+  if (value.constructor?.name === 'Decimal') return Number(value);
+  return Number(value) || 0;
 };
