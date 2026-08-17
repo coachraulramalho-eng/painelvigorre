@@ -47,12 +47,14 @@ export function QRCodeGenerator({ onGenerate, onDownload }: QRCodeGeneratorProps
     const loadLogo = async () => {
       try {
         const response = await fetch('/logo-vigorre-qr.png');
-        const blob = await response.blob();
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          setLogoPreview(reader.result as string);
-        };
-        reader.readAsDataURL(blob);
+        if (response.ok) {
+          const blob = await response.blob();
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            setLogoPreview(reader.result as string);
+          };
+          reader.readAsDataURL(blob);
+        }
       } catch (error) {
         console.error('Erro ao carregar logo:', error);
       }
@@ -456,7 +458,7 @@ export function QRCodeGenerator({ onGenerate, onDownload }: QRCodeGeneratorProps
                 <img 
                   src={logoPreview} 
                   alt="Logo Vigorre" 
-                  className="h-8 w-8 rounded object-contain bg-white"
+                  className="h-8 w-8 rounded object-contain bg-white border"
                 />
               ) : (
                 <ImageIcon className="h-5 w-5 text-muted-foreground" />
@@ -507,9 +509,9 @@ export function QRCodeGenerator({ onGenerate, onDownload }: QRCodeGeneratorProps
               {getTypeLabel()}
             </span>
             <Badge variant="outline" className="flex items-center gap-1">
-              {includeLogo && (
+              {includeLogo && logoPreview && (
                 <img 
-                  src={logoPreview || ''} 
+                  src={logoPreview} 
                   alt="Logo" 
                   className="h-3 w-3 rounded object-contain"
                 />
@@ -580,12 +582,12 @@ export function QRCodeGenerator({ onGenerate, onDownload }: QRCodeGeneratorProps
                 Preencha os dados ao lado<br />
                 e clique em "Gerar QR Code"
               </p>
-              {includeLogo && (
+              {includeLogo && logoPreview && (
                 <div className="flex items-center gap-2 mt-4 p-2 bg-secondary rounded">
                   <img 
-                    src={logoPreview || ''} 
+                    src={logoPreview} 
                     alt="Logo" 
-                    className="h-6 w-6 rounded object-contain bg-white"
+                    className="h-6 w-6 rounded object-contain bg-white border"
                   />
                   <span className="text-xs">Logo da Vigorre será incluída</span>
                 </div>
