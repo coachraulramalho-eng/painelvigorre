@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
 import { prisma } from '@/lib/db/prisma';
 import { getToken } from 'next-auth/jwt';
 import { hash } from 'bcryptjs';
@@ -12,7 +13,7 @@ const createUserSchema = z.object({
   active: z.boolean().default(true),
 });
 
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   try {
     const token = await getToken({ req: request as any });
     
@@ -23,7 +24,6 @@ export async function GET(request: Request) {
       );
     }
 
-    // Verificar se é ADM Master
     if (token.role !== 'ADM Master') {
       return NextResponse.json(
         { error: 'Sem permissão para visualizar usuários' },
@@ -52,7 +52,6 @@ export async function GET(request: Request) {
       },
     });
 
-    // Remover senhas
     const usersWithoutPassword = users.map(({ password, ...user }) => user);
 
     return NextResponse.json(usersWithoutPassword);
@@ -65,7 +64,7 @@ export async function GET(request: Request) {
   }
 }
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
     const token = await getToken({ req: request as any });
     
@@ -76,7 +75,6 @@ export async function POST(request: Request) {
       );
     }
 
-    // Verificar se é ADM Master
     if (token.role !== 'ADM Master') {
       return NextResponse.json(
         { error: 'Sem permissão para criar usuários' },
@@ -87,7 +85,6 @@ export async function POST(request: Request) {
     const body = await request.json();
     const validatedData = createUserSchema.parse(body);
 
-    // Verificar se usuário já existe
     const existingUser = await prisma.user.findUnique({
       where: { email: validatedData.email },
     });
@@ -99,10 +96,8 @@ export async function POST(request: Request) {
       );
     }
 
-    // Hash da senha
     const hashedPassword = await hash(validatedData.password, 10);
 
-    // Criar usuário
     const user = await prisma.user.create({
       data: {
         name: validatedData.name,
@@ -130,10 +125,8 @@ export async function POST(request: Request) {
       },
     });
 
-    // Remover senha
     const { password, ...userWithoutPassword } = user;
 
-    // Registrar auditoria
     await prisma.auditLog.create({
       data: {
         userId: token.id as string,
