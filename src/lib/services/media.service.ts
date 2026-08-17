@@ -12,15 +12,25 @@ interface MediaFile {
   mimeType: string;
   size: number;
   url: string;
-  thumbnailUrl?: string;
+  thumbnailUrl: string | null;
   type: 'image' | 'video' | 'document' | 'other';
   category: string;
   tags: string[];
-  description?: string;
+  description: string | null;
   uploadedBy: string;
-  campaignId?: string;
+  campaignId: string | null;
   createdAt: Date;
   updatedAt: Date;
+  uploadedByUser?: {
+    id: string;
+    name: string;
+    email: string;
+  };
+  campaign?: {
+    id: string;
+    name: string;
+    status: string;
+  };
 }
 
 interface UploadOptions {
@@ -110,13 +120,12 @@ export const uploadMediaFile = async (
       )
       .toBuffer();
     
-    // Salvar a imagem redimensionada (sobrescrever)
     fs.writeFileSync(filepath, resized);
     processedBuffer = resized;
   }
 
   // Gerar thumbnail se for imagem
-  let thumbnailUrl: string | undefined;
+  let thumbnailUrl: string | null = null;
   if (mediaType === 'image' && options.makeThumbnail !== false) {
     thumbnailUrl = await generateThumbnail(filename, options.thumbnailSize || THUMBNAIL_SIZE);
   }
@@ -130,13 +139,13 @@ export const uploadMediaFile = async (
       mimeType: file.type,
       size: processedBuffer.length,
       url: `/media/${filename}`,
-      thumbnailUrl: thumbnailUrl ? `/media/thumbnails/${thumbnailUrl}` : undefined,
+      thumbnailUrl: thumbnailUrl ? `/media/thumbnails/${thumbnailUrl}` : null,
       type: mediaType,
       category: options.category,
       tags: options.tags || [],
-      description: options.description,
+      description: options.description || null,
       uploadedBy: userId,
-      campaignId: options.campaignId,
+      campaignId: options.campaignId || null,
     },
   });
 
@@ -166,7 +175,7 @@ export const uploadMultipleMedia = async (
 export const generateThumbnail = async (
   filename: string,
   size: number = THUMBNAIL_SIZE
-): Promise<string> => {
+): Promise<string | null> => {
   const inputPath = path.join(MEDIA_DIR, filename);
   const outputFilename = `thumb-${filename}`;
   const outputPath = path.join(THUMBNAIL_DIR, outputFilename);
@@ -183,7 +192,7 @@ export const generateThumbnail = async (
     return outputFilename;
   } catch (error) {
     console.error('Erro ao gerar thumbnail:', error);
-    return '';
+    return null;
   }
 };
 
@@ -209,6 +218,13 @@ export const getMediaById = async (id: string): Promise<MediaFile | null> => {
           email: true,
         },
       },
+      campaign: {
+        select: {
+          id: true,
+          name: true,
+          status: true,
+        },
+      },
     },
   });
 };
@@ -222,6 +238,13 @@ export const getMediaByCategory = async (category: string): Promise<MediaFile[]>
           id: true,
           name: true,
           email: true,
+        },
+      },
+      campaign: {
+        select: {
+          id: true,
+          name: true,
+          status: true,
         },
       },
     },
@@ -244,6 +267,13 @@ export const getMediaByTags = async (tags: string[]): Promise<MediaFile[]> => {
           email: true,
         },
       },
+      campaign: {
+        select: {
+          id: true,
+          name: true,
+          status: true,
+        },
+      },
     },
     orderBy: { createdAt: 'desc' },
   });
@@ -260,6 +290,13 @@ export const getMediaByCampaign = async (campaignId: string): Promise<MediaFile[
           email: true,
         },
       },
+      campaign: {
+        select: {
+          id: true,
+          name: true,
+          status: true,
+        },
+      },
     },
     orderBy: { createdAt: 'desc' },
   });
@@ -273,13 +310,11 @@ export const deleteMedia = async (id: string): Promise<boolean> => {
 
     if (!media) return false;
 
-    // Deletar arquivo físico
     const filepath = path.join(MEDIA_DIR, path.basename(media.url));
     if (fs.existsSync(filepath)) {
       fs.unlinkSync(filepath);
     }
 
-    // Deletar thumbnail
     if (media.thumbnailUrl) {
       const thumbPath = path.join(THUMBNAIL_DIR, path.basename(media.thumbnailUrl));
       if (fs.existsSync(thumbPath)) {
@@ -287,7 +322,6 @@ export const deleteMedia = async (id: string): Promise<boolean> => {
       }
     }
 
-    // Deletar registro
     await prisma.media.delete({
       where: { id },
     });
@@ -312,6 +346,13 @@ export const updateMedia = async (
           id: true,
           name: true,
           email: true,
+        },
+      },
+      campaign: {
+        select: {
+          id: true,
+          name: true,
+          status: true,
         },
       },
     },
@@ -385,6 +426,13 @@ export const searchMedia = async (
             id: true,
             name: true,
             email: true,
+          },
+        },
+        campaign: {
+          select: {
+            id: true,
+            name: true,
+            status: true,
           },
         },
       },
