@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
 import { scheduleBackup } from '@/lib/services/backup.service';
 
-export async function POST() {
+export async function POST(request: NextRequest) {
   try {
     // Verificar secret para segurança
     const authHeader = request.headers.get('authorization');
