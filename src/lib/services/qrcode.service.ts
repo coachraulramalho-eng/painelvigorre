@@ -9,6 +9,7 @@ interface QRCodeOptions {
     light?: string;
   };
   errorCorrectionLevel?: 'L' | 'M' | 'Q' | 'H';
+  format?: 'dataURL' | 'svg' | 'buffer';
 }
 
 // ========== GERAÇÃO DE QR CODE ==========
@@ -115,7 +116,7 @@ export const generateProposalQRCode = async (
     type: 'proposal',
     id: proposalId,
     number: proposalNumber,
-    url: `${process.env.NEXTAUTH_URL}/propostas/${proposalId}`,
+    url: `${process.env.NEXTAUTH_URL}/comercial/propostas/${proposalId}`,
   });
 
   return generateQRCodeDataURL(data, {
@@ -187,18 +188,36 @@ export const generateLeadQRCode = async (
   });
 };
 
-// ========== QR CODE COM LOGO ==========
+// ========== QR CODE COM LOGO (PREPARADO) ==========
 export const generateQRCodeWithLogo = async (
   data: string,
   logoBase64: string,
   options: QRCodeOptions = {}
 ): Promise<string> => {
-  // Esta função requer uma biblioteca adicional como canvas
-  // Para implementação completa, usaríamos sharp ou canvas
-  // Exemplo simplificado:
-  const qrDataUrl = await generateQRCodeDataURL(data, options);
+  // Esta função requer uma biblioteca adicional como canvas/sharp
+  // Para implementação completa, usaríamos canvas para sobrepor o logo
   
-  // Em produção, aqui sobreporíamos o logo usando canvas/sharp
-  // Retornamos o QR Code base por enquanto
-  return qrDataUrl;
+  // Exemplo simplificado - retorna QR Code base por enquanto
+  console.log('Logo será sobreposto ao QR Code (requer implementação com canvas/sharp)');
+  return generateQRCodeDataURL(data, options);
+};
+
+// ========== VALIDAÇÃO ==========
+export const validateQRCodeData = (data: string): boolean => {
+  try {
+    const parsed = JSON.parse(data);
+    return parsed && typeof parsed === 'object';
+  } catch {
+    // Se não for JSON, consideramos válido (URL, texto, etc)
+    return true;
+  }
+};
+
+// ========== DECODE ==========
+export const decodeQRCodeData = (data: string): any => {
+  try {
+    return JSON.parse(data);
+  } catch {
+    return { raw: data };
+  }
 };
