@@ -5,15 +5,6 @@
   "installCommand": "npm install",
   "framework": "nextjs",
   "regions": ["gru1"],
-  "env": {
-    "NEXTAUTH_URL": "https://painelvigorre.vercel.app",
-    "NEXTAUTH_SECRET": "@nextauth_secret",
-    "DATABASE_URL": "@database_url",
-    "DIRECT_URL": "@direct_url",
-    "JWT_SECRET": "@jwt_secret",
-    "CRON_SECRET": "@cron_secret",
-    "SIGNATURE_SECRET": "@signature_secret"
-  },
   "headers": [
     {
       "source": "/(.*)",
