@@ -128,7 +128,8 @@ export async function POST(request: NextRequest) {
         qrCode = await generateQRCodeSVG(data, options);
       } else if (format === 'buffer') {
         const buffer = await generateQRCodeBuffer(data, options);
-        return new NextResponse(buffer, {
+        // Para buffer, retornamos como dataURL ou base64
+        return new NextResponse(buffer.toString('base64'), {
           headers: {
             'Content-Type': 'image/png',
             'Content-Disposition': `attachment; filename="qrcode-vigorre.png"`,
