@@ -7,7 +7,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
 import { 
   Download, 
   Copy, 
@@ -18,10 +17,9 @@ import {
   DollarSign,
   FileSignature,
   User,
-  Building,
+  Image as ImageIcon,
   RefreshCw,
-  Loader2,
-  Image as ImageIcon
+  Loader2
 } from 'lucide-react';
 
 interface QRCodeGeneratorProps {
@@ -42,7 +40,6 @@ export function QRCodeGenerator({ onGenerate, onDownload }: QRCodeGeneratorProps
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const qrRef = useRef<HTMLDivElement>(null);
 
-  // Carregar logo da Vigorre
   useEffect(() => {
     const loadLogo = async () => {
       try {
@@ -62,7 +59,6 @@ export function QRCodeGenerator({ onGenerate, onDownload }: QRCodeGeneratorProps
     loadLogo();
   }, []);
 
-  // Dados específicos por tipo
   const [paymentData, setPaymentData] = useState({
     link: '',
     value: '',
@@ -401,7 +397,7 @@ export function QRCodeGenerator({ onGenerate, onDownload }: QRCodeGeneratorProps
     }
   };
 
-  const getTypeIcon = () => {
+  const getTypeIcon = (type: QRType) => {
     const icons: Record<QRType, any> = {
       custom: QrCode,
       payment: DollarSign,
@@ -413,7 +409,7 @@ export function QRCodeGenerator({ onGenerate, onDownload }: QRCodeGeneratorProps
     return icons[type] || QrCode;
   };
 
-  const getTypeLabel = () => {
+  const getTypeLabel = (type: QRType) => {
     const labels: Record<QRType, string> = {
       custom: 'Personalizado',
       payment: 'Pagamento',
@@ -424,6 +420,9 @@ export function QRCodeGenerator({ onGenerate, onDownload }: QRCodeGeneratorProps
     };
     return labels[type] || 'Personalizado';
   };
+
+  const TypeIcon = getTypeIcon(type);
+  const typeLabel = getTypeLabel(type);
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -505,8 +504,8 @@ export function QRCodeGenerator({ onGenerate, onDownload }: QRCodeGeneratorProps
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
             <span className="flex items-center gap-2">
-              {getTypeIcon && <getTypeIcon className="h-5 w-5" />}
-              {getTypeLabel()}
+              <TypeIcon className="h-5 w-5" />
+              {typeLabel}
             </span>
             <Badge variant="outline" className="flex items-center gap-1">
               {includeLogo && logoPreview && (
@@ -534,7 +533,6 @@ export function QRCodeGenerator({ onGenerate, onDownload }: QRCodeGeneratorProps
                 />
               </div>
 
-              {/* Informações adicionais */}
               {includeLogo && (
                 <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
                   <span>✅ Logo da Vigorre no centro</span>
