@@ -137,10 +137,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    let responsibleId = validatedData.representativeId || token.id;
+    // Garantir que responsibleId seja sempre uma string
+    let responsibleId: string = token.id as string;
     
-    if (token.role === 'Representante') {
-      responsibleId = token.id;
+    if (validatedData.representativeId && token.role !== 'Representante') {
+      responsibleId = validatedData.representativeId;
     }
 
     let companyId = validatedData.companyId;
