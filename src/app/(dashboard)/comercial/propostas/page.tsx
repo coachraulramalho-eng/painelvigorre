@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -124,12 +125,12 @@ export default function PropostasPage() {
           <h1 className="text-2xl font-bold text-primary">Propostas</h1>
           <p className="text-muted-foreground">Gerencie todas as propostas comerciais da Vigorre</p>
         </div>
-        <div className="flex gap-2">
-          <Button className="gap-2">
+        <Button asChild className="gap-2">
+          <Link href="/comercial/propostas/novo">
             <Plus className="h-4 w-4" />
             Nova Proposta
-          </Button>
-        </div>
+          </Link>
+        </Button>
       </div>
 
       {/* Métricas */}
