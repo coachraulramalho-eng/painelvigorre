@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
 import { runDailyJobs } from '@/lib/services/cron.service';
 
-export async function POST() {
+export async function POST(request: NextRequest) {
   try {
     // Verificar secret para segurança
     const authHeader = request.headers.get('authorization');
