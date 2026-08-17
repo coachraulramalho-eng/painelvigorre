@@ -15,13 +15,10 @@ import {
   CheckCircle, 
   XCircle,
   AlertCircle,
-  Calendar,
   Building,
   UserPlus,
   FileSignature,
   Eye,
-  ArrowUpRight,
-  ArrowDownRight,
   Loader2
 } from 'lucide-react';
 import Link from 'next/link';
@@ -111,7 +108,6 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-primary">
@@ -129,9 +125,6 @@ export default function DashboardPage() {
         </Badge>
       </div>
 
-      {/* ========== CARDS DE MÉTRICAS ========== */}
-
-      {/* Métricas do Usuário (para não-ADM) */}
       {!isMaster && metrics.user && (
         <div className="grid gap-4 md:grid-cols-3">
           <Card>
@@ -172,7 +165,6 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Leads */}
       <h2 className="text-lg font-semibold text-primary">📊 Leads</h2>
       <div className="grid gap-4 md:grid-cols-4">
         <Card>
@@ -201,7 +193,6 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      {/* Propostas */}
       <h2 className="text-lg font-semibold text-primary">📄 Propostas</h2>
       <div className="grid gap-4 md:grid-cols-5">
         <Card>
@@ -236,7 +227,6 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      {/* Taxa de Conversão */}
       <Card>
         <CardContent className="p-6">
           <div className="flex items-center justify-between">
@@ -253,7 +243,6 @@ export default function DashboardPage() {
         </CardContent>
       </Card>
 
-      {/* Financeiro (apenas ADM Master) */}
       {isMaster && (
         <>
           <h2 className="text-lg font-semibold text-primary">💰 Financeiro</h2>
@@ -311,12 +300,7 @@ export default function DashboardPage() {
               </CardContent>
             </Card>
           </div>
-        </>
-      )}
 
-      {/* Representantes, Contratos e Tarefas (ADM Master) */}
-      {isMaster && (
-        <>
           <div className="grid gap-4 md:grid-cols-3">
             <Card>
               <CardHeader>
@@ -377,7 +361,6 @@ export default function DashboardPage() {
         </>
       )}
 
-      {/* Actions */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Button asChild className="gap-2">
           <Link href="/comercial/leads/novo">
