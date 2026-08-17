@@ -99,8 +99,7 @@ export const uploadMediaFile = async (
   const mediaType = detectMediaType(file.type);
 
   // Processar imagem se necessário
-  let processedBuffer = buffer;
-  let processedFilename = filename;
+  let processedBuffer: Buffer = buffer;
 
   if (mediaType === 'image' && options.resizeOptions) {
     const resized = await sharp(buffer)
