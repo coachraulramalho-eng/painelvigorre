@@ -16,24 +16,32 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const category = searchParams.get('category');
     const type = searchParams.get('type');
-    const tags = searchParams.get('tags')?.split(',');
+    const tags = searchParams.get('tags')?.split(',') || [];
     const campaignId = searchParams.get('campaignId');
     const search = searchParams.get('search');
     const limit = parseInt(searchParams.get('limit') || '50');
     const offset = parseInt(searchParams.get('offset') || '0');
+    const sortBy = searchParams.get('sortBy') || 'createdAt';
+    const sortOrder = searchParams.get('sortOrder') || 'desc';
 
     const where: any = {};
 
     if (category) where.category = category;
     if (type) where.type = type;
     if (campaignId) where.campaignId = campaignId;
-    if (tags && tags.length > 0) where.tags = { hasSome: tags };
+    if (tags && tags.length > 0 && tags[0] !== '') {
+      where.tags = { hasSome: tags };
+    }
     if (search) {
       where.OR = [
         { name: { contains: search, mode: 'insensitive' } },
         { description: { contains: search, mode: 'insensitive' } },
+        { tags: { has: search } },
       ];
     }
+
+    const orderBy: any = {};
+    orderBy[sortBy] = sortOrder;
 
     const [media, total] = await Promise.all([
       prisma.media.findMany({
@@ -46,8 +54,15 @@ export async function GET(request: Request) {
               email: true,
             },
           },
+          campaign: {
+            select: {
+              id: true,
+              name: true,
+              status: true,
+            },
+          },
         },
-        orderBy: { createdAt: 'desc' },
+        orderBy,
         skip: offset,
         take: limit,
       }),
@@ -62,6 +77,7 @@ export async function GET(request: Request) {
         limit,
         offset,
         pages: Math.ceil(total / limit),
+        currentPage: Math.floor(offset / limit) + 1,
       },
     });
   } catch (error) {
