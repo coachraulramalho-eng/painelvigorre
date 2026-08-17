@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
 import { getToken } from 'next-auth/jwt';
 import { prisma } from '@/lib/db/prisma';
 import { 
@@ -12,10 +13,9 @@ import {
   generateDocumentQRCodeWithLogo,
   generateLeadQRCodeWithLogo,
   getLogoBase64,
-  validateQRCodeData,
 } from '@/lib/services/qrcode.service';
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
     const token = await getToken({ req: request as any });
     
@@ -40,10 +40,8 @@ export async function POST(request: Request) {
     let format = options?.format || 'dataURL';
     let metadata: any = {};
 
-    // Carregar logo se necessário
     const logoBase64 = includeLogo ? getLogoBase64() : undefined;
 
-    // Gerar QR Code específico se solicitado
     if (specificType) {
       switch (specificType) {
         case 'payment':
@@ -124,7 +122,6 @@ export async function POST(request: Request) {
           );
       }
     } else {
-      // Gerar QR Code genérico com logo
       if (includeLogo && logoBase64) {
         qrCode = await generateQRCodeWithLogo(data, logoBase64, options);
       } else if (format === 'svg') {
@@ -142,7 +139,6 @@ export async function POST(request: Request) {
       }
     }
 
-    // Registrar no banco (opcional)
     try {
       await prisma.qRCode.create({
         data: {
@@ -153,7 +149,6 @@ export async function POST(request: Request) {
         },
       });
     } catch (error) {
-      // Não falhar se não conseguir registrar
       console.warn('Não foi possível registrar QR Code:', error);
     }
 
@@ -173,7 +168,7 @@ export async function POST(request: Request) {
   }
 }
 
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   try {
     const token = await getToken({ req: request as any });
     
