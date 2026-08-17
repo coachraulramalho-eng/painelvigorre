@@ -50,12 +50,8 @@ export default function LoginPage() {
             <span className="text-white text-2xl font-bold">V</span>
           </div>
         </div>
-        <CardTitle className="text-2xl text-primary">
-          Vigorre ADM™
-        </CardTitle>
-        <CardDescription>
-          Acesse o painel de gestão da Vigorre
-        </CardDescription>
+        <CardTitle className="text-2xl text-primary">Vigorre ADM™</CardTitle>
+        <CardDescription>Acesse o painel de gestão da Vigorre</CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
