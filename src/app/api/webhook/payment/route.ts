@@ -14,8 +14,9 @@ export async function POST(request: NextRequest) {
 
     switch (event) {
       case 'payment.succeeded': {
-        // Atualizar status do pagamento
-        const paymentLink = await prisma.paymentLink.findUnique({
+        // Buscar o payment link pelo URL
+        // NOTA: O campo `url` não é único no schema, então usamos findFirst
+        const paymentLink = await prisma.paymentLink.findFirst({
           where: { url: data.link_id },
           include: {
             proposal: {
@@ -51,7 +52,7 @@ export async function POST(request: NextRequest) {
                 data: {
                   status: 'Recebido',
                   receivedAt: new Date(),
-                  receivedValue: data.amount,
+                  receivedValue: data.amount || 0,
                 },
               });
             }
@@ -62,8 +63,8 @@ export async function POST(request: NextRequest) {
                 paymentLink.proposal.responsibleId,
                 paymentLink.proposal.responsible.email,
                 paymentLink.proposal.company?.name || '',
-                data.amount,
-                paymentLink.proposal.number
+                data.amount || 0,
+                paymentLink.proposal.number || ''
               );
             }
           }
@@ -74,11 +75,13 @@ export async function POST(request: NextRequest) {
 
       case 'payment.failed': {
         // Registrar falha e notificar
+        console.log('Pagamento falhou:', data);
         break;
       }
 
       case 'payment.refunded': {
         // Processar reembolso
+        console.log('Pagamento reembolsado:', data);
         break;
       }
 
