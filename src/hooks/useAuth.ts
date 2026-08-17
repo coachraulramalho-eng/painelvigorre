@@ -26,9 +26,9 @@ export function useAuth() {
       router.refresh();
       return { success: true };
     } catch (error) {
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Erro ao fazer login' 
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Erro ao fazer login',
       };
     } finally {
       setLoading(false);
