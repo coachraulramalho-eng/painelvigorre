@@ -11,10 +11,12 @@ interface SignatureRequest {
   signerEmail: string;
   signerPhone?: string;
   status: 'pending' | 'viewed' | 'signed' | 'declined' | 'expired' | 'cancelled';
-  signatureData?: string; // Base64 da assinatura
+  signatureData?: string;
   signatureDate?: Date;
+  token: string;
   ipAddress?: string;
   userAgent?: string;
+  notes?: string;
   expiresAt?: Date;
   createdAt: Date;
   updatedAt: Date;
@@ -22,6 +24,7 @@ interface SignatureRequest {
 
 interface SignatureField {
   id: string;
+  documentId: string;
   name: string;
   type: 'signature' | 'initial' | 'date' | 'text' | 'checkbox' | 'radio';
   x: number;
@@ -34,6 +37,18 @@ interface SignatureField {
   signerId: string;
 }
 
+interface SignatureFieldInput {
+  name: string;
+  type: 'signature' | 'initial' | 'date' | 'text' | 'checkbox' | 'radio';
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  page: number;
+  required?: boolean;
+  signerId: string;
+}
+
 // ========== CRIAÇÃO DE SOLICITAÇÃO ==========
 export const createSignatureRequest = async (
   documentId: string,
@@ -41,6 +56,15 @@ export const createSignatureRequest = async (
   expiresInDays: number = 7
 ): Promise<SignatureRequest[]> => {
   const requests: SignatureRequest[] = [];
+
+  // Verificar se documento existe
+  const document = await prisma.document.findUnique({
+    where: { id: documentId },
+  });
+
+  if (!document) {
+    throw new Error('Documento não encontrado');
+  }
 
   for (const signer of signers) {
     const id = randomUUID();
@@ -51,7 +75,7 @@ export const createSignatureRequest = async (
       data: {
         id,
         documentId,
-        documentTitle: await getDocumentTitle(documentId),
+        documentTitle: document.title,
         signerName: signer.name,
         signerEmail: signer.email,
         signerPhone: signer.phone,
@@ -61,10 +85,29 @@ export const createSignatureRequest = async (
       },
     });
 
+    // Registrar auditoria
+    await prisma.auditLog.create({
+      data: {
+        userId: 'system',
+        action: 'CREATE',
+        module: 'signature',
+        recordId: id,
+        newData: { signer: signer.email, document: documentId },
+      },
+    });
+
     requests.push(request);
 
-    // Enviar e-mail de convite
-    await sendSignatureInvitation(request, signer);
+    // Enviar notificação
+    await prisma.notification.create({
+      data: {
+        userId: 'system',
+        type: 'info',
+        title: '📝 Solicitação de Assinatura',
+        message: `${signer.name} foi convidado para assinar "${document.title}"`,
+        link: `/documentos/${documentId}`,
+      },
+    });
   }
 
   return requests;
@@ -72,38 +115,39 @@ export const createSignatureRequest = async (
 
 // ========== GERAÇÃO DE TOKEN ==========
 const generateSignatureToken = (requestId: string, email: string): string => {
-  const data = `${requestId}:${email}:${process.env.SIGNATURE_SECRET}`;
-  return createHash('sha256').update(data).digest('hex').substring(0, 32);
+  const secret = process.env.SIGNATURE_SECRET || 'vigorre-signature-secret';
+  const data = `${requestId}:${email}:${secret}`;
+  return createHash('sha256').update(data).digest('hex').substring(0, 64);
 };
 
-// ========== OBTENÇÃO DO DOCUMENTO ==========
-const getDocumentTitle = async (documentId: string): Promise<string> => {
-  const document = await prisma.document.findUnique({
-    where: { id: documentId },
-  });
-  return document?.title || 'Documento';
-};
-
-// ========== ENVIO DE CONVITE ==========
-const sendSignatureInvitation = async (
-  request: SignatureRequest,
-  signer: { name: string; email: string }
-) => {
-  const signatureUrl = `${process.env.NEXTAUTH_URL}/assinatura/${request.token}`;
-
-  // Criar notificação
-  await prisma.notification.create({
-    data: {
-      userId: 'system',
-      type: 'info',
-      title: '📝 Solicitação de Assinatura',
-      message: `${signer.name} foi convidado para assinar "${request.documentTitle}"`,
-      link: `/documentos/${request.documentId}`,
+// ========== VALIDAÇÃO DE TOKEN ==========
+export const validateSignatureToken = async (token: string): Promise<SignatureRequest | null> => {
+  const request = await prisma.signatureRequest.findFirst({
+    where: { token },
+    include: {
+      document: {
+        include: {
+          company: true,
+          responsible: true,
+        },
+      },
     },
   });
 
-  // Enviar e-mail (via service)
-  // await sendSignatureEmail(signer.email, signer.name, request.documentTitle, signatureUrl);
+  if (!request) {
+    return null;
+  }
+
+  // Verificar expiração
+  if (request.expiresAt && new Date() > request.expiresAt) {
+    await prisma.signatureRequest.update({
+      where: { id: request.id },
+      data: { status: 'expired' },
+    });
+    return { ...request, status: 'expired' };
+  }
+
+  return request;
 };
 
 // ========== PROCESSAMENTO DE ASSINATURA ==========
@@ -125,8 +169,17 @@ export const processSignature = async (
     throw new Error('Documento já assinado');
   }
 
+  if (request.status === 'declined') {
+    throw new Error('Solicitação de assinatura foi recusada');
+  }
+
   if (request.expiresAt && new Date() > request.expiresAt) {
     throw new Error('Solicitação de assinatura expirada');
+  }
+
+  // Validar assinatura (verificar se não está vazia)
+  if (!signatureData || signatureData.length < 100) {
+    throw new Error('Assinatura inválida ou muito curta');
   }
 
   // Atualizar solicitação
@@ -149,6 +202,17 @@ export const processSignature = async (
     }
   }
 
+  // Registrar auditoria
+  await prisma.auditLog.create({
+    data: {
+      userId: 'system',
+      action: 'SIGN',
+      module: 'signature',
+      recordId: request.id,
+      newData: { signer: request.signerEmail, signedAt: new Date() },
+    },
+  });
+
   // Verificar se todos os signatários assinaram
   await checkAllSignatures(request.documentId);
 
@@ -162,12 +226,16 @@ export const checkAllSignatures = async (documentId: string): Promise<boolean> =
   });
 
   const allSigned = requests.every((r) => r.status === 'signed');
+  const anyDeclined = requests.some((r) => r.status === 'declined');
 
   if (allSigned) {
     // Atualizar status do documento
     await prisma.document.update({
       where: { id: documentId },
-      data: { status: 'Assinado' },
+      data: { 
+        status: 'Assinado',
+        updatedAt: new Date(),
+      },
     });
 
     // Criar notificação
@@ -175,8 +243,42 @@ export const checkAllSignatures = async (documentId: string): Promise<boolean> =
       data: {
         userId: 'system',
         type: 'success',
-        title: '✅ Documento Assinado',
-        message: `Todos os signatários assinaram o documento "${await getDocumentTitle(documentId)}"`,
+        title: '✅ Documento Assinado por Todos',
+        message: `Todos os signatários assinaram o documento "${requests[0]?.documentTitle || documentId}"`,
+        link: `/documentos/${documentId}`,
+      },
+    });
+
+    // Registrar auditoria
+    await prisma.auditLog.create({
+      data: {
+        userId: 'system',
+        action: 'COMPLETE',
+        module: 'signature',
+        recordId: documentId,
+        newData: { status: 'completed', signedAt: new Date() },
+      },
+    });
+
+    return true;
+  }
+
+  if (anyDeclined) {
+    // Atualizar status do documento
+    await prisma.document.update({
+      where: { id: documentId },
+      data: { 
+        status: 'Recusado',
+        updatedAt: new Date(),
+      },
+    });
+
+    await prisma.notification.create({
+      data: {
+        userId: 'system',
+        type: 'error',
+        title: '❌ Documento Recusado',
+        message: `Um signatário recusou a assinatura do documento "${requests[0]?.documentTitle || documentId}"`,
         link: `/documentos/${documentId}`,
       },
     });
@@ -198,19 +300,28 @@ export const declineSignature = async (
     throw new Error('Solicitação de assinatura inválida');
   }
 
-  return prisma.signatureRequest.update({
+  if (request.status === 'signed') {
+    throw new Error('Documento já foi assinado');
+  }
+
+  const updatedRequest = await prisma.signatureRequest.update({
     where: { id: request.id },
     data: {
       status: 'declined',
       notes: reason,
     },
   });
+
+  // Verificar se todos os signatários recusaram
+  await checkAllSignatures(request.documentId);
+
+  return updatedRequest;
 };
 
 // ========== VISUALIZAÇÃO ==========
 export const markAsViewed = async (token: string): Promise<void> => {
   await prisma.signatureRequest.updateMany({
-    where: { token },
+    where: { token, status: 'pending' },
     data: { status: 'viewed' },
   });
 };
@@ -218,7 +329,7 @@ export const markAsViewed = async (token: string): Promise<void> => {
 // ========== CAMPOS DE ASSINATURA ==========
 export const createSignatureFields = async (
   documentId: string,
-  fields: Omit<SignatureField, 'id'>[]
+  fields: SignatureFieldInput[]
 ): Promise<SignatureField[]> => {
   const created: SignatureField[] = [];
 
@@ -234,7 +345,7 @@ export const createSignatureFields = async (
         width: field.width,
         height: field.height,
         page: field.page,
-        required: field.required,
+        required: field.required !== undefined ? field.required : true,
         signerId: field.signerId,
       },
     });
@@ -247,12 +358,37 @@ export const createSignatureFields = async (
 export const getSignatureFields = async (documentId: string): Promise<SignatureField[]> => {
   return prisma.signatureField.findMany({
     where: { documentId },
-    orderBy: { page: 'asc' },
+    orderBy: [
+      { page: 'asc' },
+      { y: 'asc' },
+      { x: 'asc' },
+    ],
   });
 };
 
+export const updateSignatureField = async (
+  fieldId: string,
+  data: Partial<SignatureField>
+): Promise<SignatureField | null> => {
+  return prisma.signatureField.update({
+    where: { id: fieldId },
+    data,
+  });
+};
+
+export const deleteSignatureField = async (fieldId: string): Promise<boolean> => {
+  try {
+    await prisma.signatureField.delete({
+      where: { id: fieldId },
+    });
+    return true;
+  } catch {
+    return false;
+  }
+};
+
 // ========== EXPIRAÇÃO ==========
-export const expirePendingSignatures = async () => {
+export const expirePendingSignatures = async (): Promise<number> => {
   const expired = await prisma.signatureRequest.updateMany({
     where: {
       status: 'pending',
@@ -262,4 +398,52 @@ export const expirePendingSignatures = async () => {
   });
 
   return expired.count;
+};
+
+// ========== RELATÓRIOS ==========
+export const getSignatureStats = async () => {
+  const total = await prisma.signatureRequest.count();
+  const byStatus = await prisma.signatureRequest.groupBy({
+    by: ['status'],
+    _count: true,
+  });
+  const today = new Date();
+  const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+
+  const todayCount = await prisma.signatureRequest.count({
+    where: {
+      createdAt: { gte: todayStart },
+    },
+  });
+
+  return {
+    total,
+    today: todayCount,
+    byStatus: byStatus.map(item => ({ status: item.status, count: item._count })),
+  };
+};
+
+// ========== ENVIO DE CONVITE (EMAIL) ==========
+export const sendSignatureInvitationEmail = async (
+  requestId: string
+): Promise<boolean> => {
+  try {
+    const request = await prisma.signatureRequest.findUnique({
+      where: { id: requestId },
+    });
+
+    if (!request) {
+      return false;
+    }
+
+    const signatureUrl = `${process.env.NEXTAUTH_URL}/assinatura/${request.token}`;
+
+    // Aqui seria implementado o envio de e-mail real
+    console.log(`📧 Enviando convite para ${request.signerEmail}: ${signatureUrl}`);
+
+    return true;
+  } catch (error) {
+    console.error('Erro ao enviar convite:', error);
+    return false;
+  }
 };
