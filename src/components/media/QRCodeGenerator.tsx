@@ -1,11 +1,13 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import { 
   Download, 
   Copy, 
@@ -18,7 +20,8 @@ import {
   User,
   Building,
   RefreshCw,
-  Loader2
+  Loader2,
+  Image as ImageIcon
 } from 'lucide-react';
 
 interface QRCodeGeneratorProps {
@@ -35,7 +38,27 @@ export function QRCodeGenerator({ onGenerate, onDownload }: QRCodeGeneratorProps
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [includeLogo, setIncludeLogo] = useState(true);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const qrRef = useRef<HTMLDivElement>(null);
+
+  // Carregar logo da Vigorre
+  useEffect(() => {
+    const loadLogo = async () => {
+      try {
+        const response = await fetch('/logo-vigorre-qr.png');
+        const blob = await response.blob();
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setLogoPreview(reader.result as string);
+        };
+        reader.readAsDataURL(blob);
+      } catch (error) {
+        console.error('Erro ao carregar logo:', error);
+      }
+    };
+    loadLogo();
+  }, []);
 
   // Dados específicos por tipo
   const [paymentData, setPaymentData] = useState({
@@ -69,7 +92,7 @@ export function QRCodeGenerator({ onGenerate, onDownload }: QRCodeGeneratorProps
     setError(null);
 
     try {
-      let dataToSend: any = { data: '', type: type };
+      let dataToSend: any = { data: '', type: type, includeLogo };
 
       switch (type) {
         case 'custom':
@@ -90,6 +113,7 @@ export function QRCodeGenerator({ onGenerate, onDownload }: QRCodeGeneratorProps
           dataToSend = {
             specificType: 'payment',
             data: paymentData,
+            includeLogo,
           };
           break;
 
@@ -102,6 +126,7 @@ export function QRCodeGenerator({ onGenerate, onDownload }: QRCodeGeneratorProps
           dataToSend = {
             specificType: 'proposal',
             data: proposalData,
+            includeLogo,
           };
           break;
 
@@ -114,6 +139,7 @@ export function QRCodeGenerator({ onGenerate, onDownload }: QRCodeGeneratorProps
           dataToSend = {
             specificType: 'contract',
             data: contractData,
+            includeLogo,
           };
           break;
 
@@ -126,6 +152,7 @@ export function QRCodeGenerator({ onGenerate, onDownload }: QRCodeGeneratorProps
           dataToSend = {
             specificType: 'document',
             data: documentData,
+            includeLogo,
           };
           break;
 
@@ -138,6 +165,7 @@ export function QRCodeGenerator({ onGenerate, onDownload }: QRCodeGeneratorProps
           dataToSend = {
             specificType: 'lead',
             data: leadData,
+            includeLogo,
           };
           break;
 
@@ -180,7 +208,7 @@ export function QRCodeGenerator({ onGenerate, onDownload }: QRCodeGeneratorProps
     if (qrCode) {
       const link = document.createElement('a');
       link.href = qrCode;
-      link.download = `qrcode-${Date.now()}.png`;
+      link.download = `qrcode-vigorre-${Date.now()}.png`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -200,11 +228,11 @@ export function QRCodeGenerator({ onGenerate, onDownload }: QRCodeGeneratorProps
       try {
         const response = await fetch(qrCode);
         const blob = await response.blob();
-        const file = new File([blob], 'qrcode.png', { type: 'image/png' });
+        const file = new File([blob], 'qrcode-vigorre.png', { type: 'image/png' });
         
         if (navigator.share) {
           await navigator.share({
-            title: 'QR Code',
+            title: 'QR Code Vigorre',
             text: 'QR Code gerado pelo Vigorre ADM™',
             files: [file],
           });
@@ -421,6 +449,29 @@ export function QRCodeGenerator({ onGenerate, onDownload }: QRCodeGeneratorProps
             </div>
           </Tabs>
 
+          {/* Opção de Logo */}
+          <div className="flex items-center justify-between p-3 bg-secondary rounded-lg">
+            <div className="flex items-center gap-3">
+              {logoPreview ? (
+                <img 
+                  src={logoPreview} 
+                  alt="Logo Vigorre" 
+                  className="h-8 w-8 rounded object-contain bg-white"
+                />
+              ) : (
+                <ImageIcon className="h-5 w-5 text-muted-foreground" />
+              )}
+              <div>
+                <p className="text-sm font-medium">Incluir Logo da Vigorre</p>
+                <p className="text-xs text-muted-foreground">Adiciona a marca no centro do QR Code</p>
+              </div>
+            </div>
+            <Switch 
+              checked={includeLogo} 
+              onCheckedChange={setIncludeLogo}
+            />
+          </div>
+
           {error && (
             <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">
               {error}
@@ -455,7 +506,16 @@ export function QRCodeGenerator({ onGenerate, onDownload }: QRCodeGeneratorProps
               {getTypeIcon && <getTypeIcon className="h-5 w-5" />}
               {getTypeLabel()}
             </span>
-            <Badge variant="outline">Pronto para uso</Badge>
+            <Badge variant="outline" className="flex items-center gap-1">
+              {includeLogo && (
+                <img 
+                  src={logoPreview || ''} 
+                  alt="Logo" 
+                  className="h-3 w-3 rounded object-contain"
+                />
+              )}
+              {includeLogo ? 'Com Logo' : 'Sem Logo'}
+            </Badge>
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -467,10 +527,19 @@ export function QRCodeGenerator({ onGenerate, onDownload }: QRCodeGeneratorProps
               >
                 <img 
                   src={qrCode} 
-                  alt="QR Code" 
-                  className="max-w-[250px] w-full h-auto"
+                  alt="QR Code Vigorre" 
+                  className="max-w-[300px] w-full h-auto"
                 />
               </div>
+
+              {/* Informações adicionais */}
+              {includeLogo && (
+                <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+                  <span>✅ Logo da Vigorre no centro</span>
+                  <span>•</span>
+                  <span>Alta qualidade</span>
+                </div>
+              )}
 
               <div className="flex items-center justify-center gap-2 flex-wrap">
                 <Button variant="outline" size="sm" onClick={handleDownload}>
@@ -497,7 +566,10 @@ export function QRCodeGenerator({ onGenerate, onDownload }: QRCodeGeneratorProps
 
               <div className="p-3 bg-secondary rounded-lg">
                 <p className="text-xs text-muted-foreground text-center">
-                  Use este QR Code para compartilhar facilmente com clientes e parceiros
+                  {includeLogo 
+                    ? 'QR Code com a marca Vigorre™ - Ideal para materiais comerciais'
+                    : 'QR Code sem logo - Use para integrações e sistemas'
+                  }
                 </p>
               </div>
             </div>
@@ -508,6 +580,16 @@ export function QRCodeGenerator({ onGenerate, onDownload }: QRCodeGeneratorProps
                 Preencha os dados ao lado<br />
                 e clique em "Gerar QR Code"
               </p>
+              {includeLogo && (
+                <div className="flex items-center gap-2 mt-4 p-2 bg-secondary rounded">
+                  <img 
+                    src={logoPreview || ''} 
+                    alt="Logo" 
+                    className="h-6 w-6 rounded object-contain bg-white"
+                  />
+                  <span className="text-xs">Logo da Vigorre será incluída</span>
+                </div>
+              )}
             </div>
           )}
         </CardContent>
