@@ -166,6 +166,7 @@ export const overlayLogo = async (
               fit: 'contain',
               background: { r: 255, g: 255, b: 255, alpha: 1 },
             })
+            .png()
             .toBuffer(),
           gravity: 'center',
         },
@@ -178,6 +179,19 @@ export const overlayLogo = async (
     console.error('Erro ao sobrepor logo:', error);
     // Retornar QR Code sem logo em caso de erro
     return qrBuffer;
+  }
+};
+
+// ========== FUNÇÃO PARA OBTER LOGO BASE64 ==========
+export const getLogoBase64 = (): string | undefined => {
+  try {
+    if (fs.existsSync(LOGO_PATH)) {
+      const buffer = fs.readFileSync(LOGO_PATH);
+      return `data:image/png;base64,${buffer.toString('base64')}`;
+    }
+    return undefined;
+  } catch {
+    return undefined;
   }
 };
 
@@ -209,9 +223,9 @@ export const generateQRCodeWithLogo = async (
   const finalOptions: QRCodeOptions = {
     ...options,
     logo: {
-      base64: logoBase64,
-      size: 100,
-      margin: 10,
+      base64: logoBase64 || getLogoBase64(),
+      size: options.logo?.size || 100,
+      margin: options.logo?.margin || 10,
     },
   };
 
@@ -283,6 +297,58 @@ export const generateContractQRCodeWithLogo = async (
     id: contractId,
     title: contractTitle,
     url: `${process.env.NEXTAUTH_URL}/contratos/${contractId}`,
+  });
+
+  return generateQRCodeWithLogo(data, logoBase64, {
+    width: 280,
+    color: {
+      dark: '#0B2B4A',
+      light: '#FFFFFF',
+    },
+    logo: {
+      size: 70,
+      margin: 6,
+    },
+  });
+};
+
+// ========== GERAR QR CODE DE DOCUMENTO COM LOGO ==========
+export const generateDocumentQRCodeWithLogo = async (
+  documentId: string,
+  documentTitle: string,
+  logoBase64?: string
+): Promise<string> => {
+  const data = JSON.stringify({
+    type: 'document',
+    id: documentId,
+    title: documentTitle,
+    url: `${process.env.NEXTAUTH_URL}/documentos/${documentId}`,
+  });
+
+  return generateQRCodeWithLogo(data, logoBase64, {
+    width: 280,
+    color: {
+      dark: '#0B2B4A',
+      light: '#FFFFFF',
+    },
+    logo: {
+      size: 70,
+      margin: 6,
+    },
+  });
+};
+
+// ========== GERAR QR CODE DE LEAD COM LOGO ==========
+export const generateLeadQRCodeWithLogo = async (
+  leadId: string,
+  leadName: string,
+  logoBase64?: string
+): Promise<string> => {
+  const data = JSON.stringify({
+    type: 'lead',
+    id: leadId,
+    name: leadName,
+    url: `${process.env.NEXTAUTH_URL}/comercial/crm/${leadId}`,
   });
 
   return generateQRCodeWithLogo(data, logoBase64, {
