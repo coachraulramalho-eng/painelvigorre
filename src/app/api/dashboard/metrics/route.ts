@@ -123,12 +123,12 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Calcular resultado com valores seguros
-    const totalPaidValue = totalPaid._sum.value ?? 0;
-    const totalPaidExpensesValue = totalPaidExpenses._sum.value ?? 0;
-    const totalReceivableValue = totalReceivable._sum.value ?? 0;
-    const totalPayableValue = totalPayable._sum.value ?? 0;
-    const totalCommissionsValue = totalCommissions._sum.value ?? 0;
+    // Converter valores do Prisma Decimal para number
+    const totalPaidValue = Number(totalPaid._sum.value) || 0;
+    const totalPaidExpensesValue = Number(totalPaidExpenses._sum.value) || 0;
+    const totalReceivableValue = Number(totalReceivable._sum.value) || 0;
+    const totalPayableValue = Number(totalPayable._sum.value) || 0;
+    const totalCommissionsValue = Number(totalCommissions._sum.value) || 0;
 
     const result = totalPaidValue - totalPaidExpensesValue;
 
