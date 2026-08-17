@@ -64,23 +64,6 @@ export default function ConfiguracoesPage() {
         { label: 'Alerta de Segurança', value: 'Ativado' },
       ]
     },
-    {
-      id: 'api',
-      label: 'API',
-      icon: Key,
-      fields: [
-        { label: 'API Key', value: 'vigorre_sk_live_xxxxxxxxxxxxxxxxxxxxxxxxxxxxx' },
-        { label: 'Webhook URL', value: 'https://api.vigorre.com/webhook' },
-        { label: 'Gateway de Pagamento', value: 'Stripe (Configurado)' },
-      ]
-    },
-  ];
-
-  const integrations = [
-    { name: 'Stripe', status: 'Conectado', icon: '💳', description: 'Gateway de pagamentos' },
-    { name: 'WhatsApp', status: 'Configurar', icon: '💬', description: 'Envio de mensagens' },
-    { name: 'E-mail', status: 'Conectado', icon: '📧', description: 'SMTP configurado' },
-    { name: 'Supabase', status: 'Conectado', icon: '🗄️', description: 'Banco de dados' },
   ];
 
   return (
@@ -122,29 +105,7 @@ export default function ConfiguracoesPage() {
                       {field.label}
                     </label>
                     <div className="md:col-span-2">
-                      {section.id === 'api' && field.label === 'API Key' ? (
-                        <div className="flex gap-2">
-                          <div className="relative flex-1">
-                            <Input
-                              type={showApiKey ? 'text' : 'password'}
-                              value={field.value}
-                              className="pr-10 font-mono text-sm"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => setShowApiKey(!showApiKey)}
-                              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-primary"
-                            >
-                              {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                            </button>
-                          </div>
-                          <Button variant="outline" size="icon">
-                            <Copy className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      ) : (
-                        <Input value={field.value} />
-                      )}
+                      <Input value={field.value} />
                     </div>
                   </div>
                 ))}
@@ -162,25 +123,18 @@ export default function ConfiguracoesPage() {
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {integrations.map((integration) => (
+            {[
+              { name: 'Gateway de Pagamento', status: 'Configurar', icon: '💳' },
+              { name: 'WhatsApp', status: 'Configurar', icon: '💬' },
+              { name: 'E-mail', status: 'Configurar', icon: '📧' },
+              { name: 'Supabase', status: 'Configurar', icon: '🗄️' },
+            ].map((integration) => (
               <div key={integration.name} className="flex items-center justify-between p-4 border rounded-lg hover:shadow-md transition-shadow">
                 <div className="flex items-center gap-3">
                   <span className="text-2xl">{integration.icon}</span>
-                  <div>
-                    <p className="font-medium">{integration.name}</p>
-                    <p className="text-sm text-muted-foreground">{integration.description}</p>
-                  </div>
+                  <p className="font-medium">{integration.name}</p>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Badge variant={integration.status === 'Conectado' ? 'success' : 'warning'}>
-                    {integration.status}
-                  </Badge>
-                  {integration.status === 'Configurar' && (
-                    <Button variant="outline" size="sm">
-                      Configurar
-                    </Button>
-                  )}
-                </div>
+                <Badge variant="warning">{integration.status}</Badge>
               </div>
             ))}
           </div>
@@ -209,18 +163,7 @@ export default function ConfiguracoesPage() {
                 <p className="font-medium">Sessão Ativa</p>
                 <p className="text-sm text-muted-foreground">Tempo de expiração: 8 horas</p>
               </div>
-              <Button variant="outline" size="sm">
-                Encerrar Todas
-              </Button>
-            </div>
-            <div className="flex items-center justify-between p-3 bg-secondary rounded-lg">
-              <div>
-                <p className="font-medium">Logs de Acesso</p>
-                <p className="text-sm text-muted-foreground">Último acesso: São Paulo - SP</p>
-              </div>
-              <Button variant="outline" size="sm">
-                Visualizar
-              </Button>
+              <Button variant="outline" size="sm">Encerrar Todas</Button>
             </div>
           </CardContent>
         </Card>
@@ -239,13 +182,6 @@ export default function ConfiguracoesPage() {
                 <p className="text-sm text-muted-foreground">17/08/2026 14:30</p>
               </div>
               <Badge variant="success">Completo</Badge>
-            </div>
-            <div className="flex items-center justify-between p-3 bg-secondary rounded-lg">
-              <div>
-                <p className="font-medium">Próximo Backup</p>
-                <p className="text-sm text-muted-foreground">Automático - 24/08/2026 02:00</p>
-              </div>
-              <Badge variant="default">Programado</Badge>
             </div>
             <div className="flex gap-2">
               <Button className="gap-2 flex-1">
