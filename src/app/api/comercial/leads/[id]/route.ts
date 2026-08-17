@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
 import { prisma } from '@/lib/db/prisma';
 import { getToken } from 'next-auth/jwt';
 import { z } from 'zod';
@@ -21,10 +22,11 @@ const updateLeadSchema = z.object({
 });
 
 export async function GET(
-  request: Request,
-  { params }: { params: { id: string } }
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const token = await getToken({ req: request as any });
     
     if (!token) {
@@ -35,7 +37,7 @@ export async function GET(
     }
 
     const lead = await prisma.lead.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         company: {
           include: {
@@ -91,7 +93,6 @@ export async function GET(
       );
     }
 
-    // Verificar permissão de acesso
     if (token.role !== 'ADM Master') {
       const userPermissions = token.permissions as string[] || [];
       
@@ -116,10 +117,11 @@ export async function GET(
 }
 
 export async function PUT(
-  request: Request,
-  { params }: { params: { id: string } }
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const token = await getToken({ req: request as any });
     
     if (!token) {
@@ -132,9 +134,8 @@ export async function PUT(
     const body = await request.json();
     const validatedData = updateLeadSchema.parse(body);
 
-    // Buscar lead existente
     const existingLead = await prisma.lead.findUnique({
-      where: { id: params.id },
+      where: { id },
     });
 
     if (!existingLead) {
@@ -144,7 +145,6 @@ export async function PUT(
       );
     }
 
-    // Verificar permissão de edição
     if (token.role !== 'ADM Master') {
       const userPermissions = token.permissions as string[] || [];
       
@@ -158,10 +158,8 @@ export async function PUT(
       }
     }
 
-    // Preparar dados para atualização
     const updateData: any = { ...validatedData };
 
-    // Converter datas
     if (validatedData.lostAt) {
       updateData.lostAt = new Date(validatedData.lostAt);
     }
@@ -169,9 +167,8 @@ export async function PUT(
       updateData.convertedAt = new Date(validatedData.convertedAt);
     }
 
-    // Atualizar lead
     const updatedLead = await prisma.lead.update({
-      where: { id: params.id },
+      where: { id },
       data: updateData,
       include: {
         company: {
@@ -195,13 +192,12 @@ export async function PUT(
       },
     });
 
-    // Registrar auditoria
     await prisma.auditLog.create({
       data: {
         userId: token.id as string,
         action: 'UPDATE',
         module: 'commercial',
-        recordId: params.id,
+        recordId: id,
         oldData: existingLead,
         newData: updatedLead,
         ipAddress: request.headers.get('x-forwarded-for') || '',
@@ -227,10 +223,11 @@ export async function PUT(
 }
 
 export async function DELETE(
-  request: Request,
-  { params }: { params: { id: string } }
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const token = await getToken({ req: request as any });
     
     if (!token) {
@@ -240,7 +237,6 @@ export async function DELETE(
       );
     }
 
-    // Verificar se é ADM Master
     if (token.role !== 'ADM Master') {
       return NextResponse.json(
         { error: 'Sem permissão para excluir leads' },
@@ -248,9 +244,8 @@ export async function DELETE(
       );
     }
 
-    // Buscar lead existente
     const existingLead = await prisma.lead.findUnique({
-      where: { id: params.id },
+      where: { id },
     });
 
     if (!existingLead) {
@@ -260,9 +255,8 @@ export async function DELETE(
       );
     }
 
-    // Verificar se há relacionamentos
     const hasRelations = await prisma.opportunity.findFirst({
-      where: { leadId: params.id },
+      where: { leadId: id },
     });
 
     if (hasRelations) {
@@ -272,18 +266,16 @@ export async function DELETE(
       );
     }
 
-    // Excluir lead
     await prisma.lead.delete({
-      where: { id: params.id },
+      where: { id },
     });
 
-    // Registrar auditoria
     await prisma.auditLog.create({
       data: {
         userId: token.id as string,
         action: 'DELETE',
         module: 'commercial',
-        recordId: params.id,
+        recordId: id,
         oldData: existingLead,
         ipAddress: request.headers.get('x-forwarded-for') || '',
         userAgent: request.headers.get('user-agent') || '',
