@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
 import { getToken } from 'next-auth/jwt';
 import { prisma } from '@/lib/db/prisma';
 import { z } from 'zod';
@@ -8,7 +9,6 @@ import path from 'path';
 
 const DOCUMENT_DIR = path.join(process.cwd(), 'public', 'documents');
 
-// Inicializar diretório
 if (!fs.existsSync(DOCUMENT_DIR)) {
   fs.mkdirSync(DOCUMENT_DIR, { recursive: true });
 }
@@ -23,7 +23,7 @@ const documentSchema = z.object({
   status: z.string().default('Ativo'),
 });
 
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   try {
     const token = await getToken({ req: request as any });
     
@@ -54,7 +54,6 @@ export async function GET(request: Request) {
       ];
     }
 
-    // Verificar permissões
     if (token.role !== 'ADM Master') {
       const userPermissions = token.permissions as string[] || [];
       if (!userPermissions.includes('signature:view:all')) {
@@ -130,7 +129,7 @@ export async function GET(request: Request) {
   }
 }
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
     const token = await getToken({ req: request as any });
     
@@ -165,7 +164,6 @@ export async function POST(request: Request) {
       );
     }
 
-    // Validar tipo de arquivo
     const allowedTypes = [
       'application/pdf',
       'application/msword',
@@ -184,7 +182,6 @@ export async function POST(request: Request) {
       );
     }
 
-    // Salvar arquivo
     const id = randomUUID();
     const extension = file.name.split('.').pop() || '';
     const filename = `${id}.${extension}`;
@@ -193,7 +190,6 @@ export async function POST(request: Request) {
     const buffer = Buffer.from(await file.arrayBuffer());
     fs.writeFileSync(filepath, buffer);
 
-    // Criar documento no banco
     const document = await prisma.document.create({
       data: {
         id,
@@ -225,7 +221,6 @@ export async function POST(request: Request) {
       },
     });
 
-    // Registrar auditoria
     await prisma.auditLog.create({
       data: {
         userId: token.id as string,
