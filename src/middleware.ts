@@ -1,11 +1,10 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { getToken } from 'next-auth/jwt';
+import { auth } from '@/lib/auth/auth';
 
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
 
-  // Rotas públicas
   const publicPaths = [
     '/login',
     '/api/auth',
@@ -16,12 +15,10 @@ export async function middleware(request: NextRequest) {
     '/assinatura',
   ];
 
-  // Verificar se é rota pública
   const isPublicPath = publicPaths.some(
     (path) => pathname === path || pathname.startsWith(path)
   );
 
-  // Permitir acesso público a rotas de assinatura
   if (pathname.startsWith('/assinatura/')) {
     return NextResponse.next();
   }
@@ -30,17 +27,22 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  const token = await getToken({ req: request });
+  const session = await auth();
 
-  // Redirecionar para login se não autenticado
-  if (!token) {
+  if (!session) {
     const loginUrl = new URL('/login', request.url);
     loginUrl.searchParams.set('callbackUrl', pathname);
     return NextResponse.redirect(loginUrl);
   }
 
-  // Rotas que requerem permissões específicas
-  const protectedRoutes = {
+  const userPermissions = session.user?.permissions || [];
+  const userRole = session.user?.role;
+
+  if (userRole === 'ADM Master') {
+    return NextResponse.next();
+  }
+
+  const protectedRoutes: Record<string, { module: string; action: string }> = {
     '/financeiro': { module: 'financial', action: 'view' },
     '/comercial': { module: 'commercial', action: 'view' },
     '/marketing': { module: 'marketing', action: 'view' },
@@ -52,16 +54,8 @@ export async function middleware(request: NextRequest) {
     '/qrcode': { module: 'media', action: 'view' },
   };
 
-  // Verificar permissão para rotas protegidas
   for (const [route, permission] of Object.entries(protectedRoutes)) {
     if (pathname.startsWith(route)) {
-      const userPermissions = token.permissions as string[] || [];
-
-      // ADM Master tem acesso total
-      if (token.role === 'ADM Master') {
-        return NextResponse.next();
-      }
-
       const hasPermission = userPermissions.includes(
         `${permission.module}:${permission.action}`
       );
