@@ -30,6 +30,11 @@ interface UploadOptions {
   campaignId?: string;
   makeThumbnail?: boolean;
   thumbnailSize?: number;
+  resizeOptions?: {
+    width?: number;
+    height?: number;
+    fit?: 'cover' | 'contain' | 'fill' | 'inside' | 'outside';
+  };
 }
 
 // ========== CONFIGURAÇÃO ==========
@@ -46,6 +51,9 @@ const ALLOWED_MIME_TYPES = [
   'application/pdf',
   'application/msword',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'text/plain',
 ];
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
 const THUMBNAIL_SIZE = 300;
@@ -70,16 +78,16 @@ export const uploadMediaFile = async (
 ): Promise<MediaFile> => {
   // Validar arquivo
   if (!ALLOWED_MIME_TYPES.includes(file.type)) {
-    throw new Error('Tipo de arquivo não permitido');
+    throw new Error(`Tipo de arquivo não permitido: ${file.type}`);
   }
 
   if (file.size > MAX_FILE_SIZE) {
-    throw new Error('Arquivo muito grande. Máximo: 50MB');
+    throw new Error(`Arquivo muito grande. Máximo: ${MAX_FILE_SIZE / 1024 / 1024}MB`);
   }
 
   // Gerar nome único
   const id = randomUUID();
-  const extension = file.name.split('.').pop();
+  const extension = file.name.split('.').pop() || '';
   const filename = `${id}.${extension}`;
   const filepath = path.join(MEDIA_DIR, filename);
 
@@ -89,6 +97,23 @@ export const uploadMediaFile = async (
 
   // Detectar tipo
   const mediaType = detectMediaType(file.type);
+
+  // Processar imagem se necessário
+  let processedBuffer = buffer;
+  let processedFilename = filename;
+
+  if (mediaType === 'image' && options.resizeOptions) {
+    const resized = await sharp(buffer)
+      .resize(
+        options.resizeOptions.width,
+        options.resizeOptions.height,
+        { fit: options.resizeOptions.fit || 'cover' }
+      )
+      .toBuffer();
+    
+    processedBuffer = resized;
+    fs.writeFileSync(filepath, processedBuffer);
+  }
 
   // Gerar thumbnail se for imagem
   let thumbnailUrl: string | undefined;
@@ -103,7 +128,7 @@ export const uploadMediaFile = async (
       name: file.name,
       originalName: file.name,
       mimeType: file.type,
-      size: file.size,
+      size: processedBuffer.length,
       url: `/media/${filename}`,
       thumbnailUrl: thumbnailUrl ? `/media/thumbnails/${thumbnailUrl}` : undefined,
       type: mediaType,
@@ -152,6 +177,7 @@ export const generateThumbnail = async (
         fit: 'cover',
         position: 'center',
       })
+      .jpeg({ quality: 80 })
       .toFile(outputPath);
 
     return outputFilename;
@@ -167,6 +193,7 @@ const detectMediaType = (mimeType: string): MediaFile['type'] => {
   if (mimeType.startsWith('video/')) return 'video';
   if (mimeType === 'application/pdf') return 'document';
   if (mimeType.includes('document') || mimeType.includes('word')) return 'document';
+  if (mimeType.includes('excel') || mimeType.includes('spreadsheet')) return 'document';
   return 'other';
 };
 
@@ -174,12 +201,30 @@ const detectMediaType = (mimeType: string): MediaFile['type'] => {
 export const getMediaById = async (id: string): Promise<MediaFile | null> => {
   return prisma.media.findUnique({
     where: { id },
+    include: {
+      uploadedByUser: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+        },
+      },
+    },
   });
 };
 
 export const getMediaByCategory = async (category: string): Promise<MediaFile[]> => {
   return prisma.media.findMany({
     where: { category },
+    include: {
+      uploadedByUser: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+        },
+      },
+    },
     orderBy: { createdAt: 'desc' },
   });
 };
@@ -191,6 +236,15 @@ export const getMediaByTags = async (tags: string[]): Promise<MediaFile[]> => {
         hasSome: tags,
       },
     },
+    include: {
+      uploadedByUser: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+        },
+      },
+    },
     orderBy: { createdAt: 'desc' },
   });
 };
@@ -198,6 +252,15 @@ export const getMediaByTags = async (tags: string[]): Promise<MediaFile[]> => {
 export const getMediaByCampaign = async (campaignId: string): Promise<MediaFile[]> => {
   return prisma.media.findMany({
     where: { campaignId },
+    include: {
+      uploadedByUser: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+        },
+      },
+    },
     orderBy: { createdAt: 'desc' },
   });
 };
@@ -243,6 +306,15 @@ export const updateMedia = async (
   return prisma.media.update({
     where: { id },
     data,
+    include: {
+      uploadedByUser: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+        },
+      },
+    },
   });
 };
 
@@ -257,10 +329,71 @@ export const getMediaStats = async () => {
     by: ['category'],
     _count: true,
   });
+  const totalSize = await prisma.media.aggregate({
+    _sum: {
+      size: true,
+    },
+  });
 
   return {
     total,
+    totalSizeMB: totalSize._sum.size ? (totalSize._sum.size / 1024 / 1024).toFixed(2) : 0,
     byType: byType.map(item => ({ type: item.type, count: item._count })),
     byCategory: byCategory.map(item => ({ category: item.category, count: item._count })),
   };
+};
+
+// ========== BUSCA AVANÇADA ==========
+export const searchMedia = async (
+  query: string,
+  filters?: {
+    category?: string;
+    type?: string;
+    tags?: string[];
+    startDate?: Date;
+    endDate?: Date;
+  },
+  limit: number = 50,
+  offset: number = 0
+): Promise<{ items: MediaFile[]; total: number }> => {
+  const where: any = {};
+
+  if (query) {
+    where.OR = [
+      { name: { contains: query, mode: 'insensitive' } },
+      { description: { contains: query, mode: 'insensitive' } },
+      { tags: { has: query } },
+    ];
+  }
+
+  if (filters?.category) where.category = filters.category;
+  if (filters?.type) where.type = filters.type;
+  if (filters?.tags && filters.tags.length > 0) {
+    where.tags = { hasSome: filters.tags };
+  }
+  if (filters?.startDate) where.createdAt = { gte: filters.startDate };
+  if (filters?.endDate) {
+    where.createdAt = { ...where.createdAt, lte: filters.endDate };
+  }
+
+  const [items, total] = await Promise.all([
+    prisma.media.findMany({
+      where,
+      include: {
+        uploadedByUser: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+      skip: offset,
+      take: limit,
+    }),
+    prisma.media.count({ where }),
+  ]);
+
+  return { items, total };
 };
