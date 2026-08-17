@@ -1,14 +1,32 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getToken } from 'next-auth/jwt';
-import { getModuleFromPath, getActionFromPath, hasPermission } from '@/lib/auth/permissions';
 
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
 
   // Rotas públicas
-  const publicPaths = ['/login', '/api/auth', '/_next', '/favicon.ico'];
-  if (publicPaths.some((path) => pathname.startsWith(path))) {
+  const publicPaths = [
+    '/login',
+    '/api/auth',
+    '/_next',
+    '/favicon.ico',
+    '/api/qrcode',
+    '/api/signature',
+    '/assinatura',
+  ];
+
+  // Verificar se é rota pública
+  const isPublicPath = publicPaths.some(
+    (path) => pathname === path || pathname.startsWith(path)
+  );
+
+  // Permitir acesso público a rotas de assinatura
+  if (pathname.startsWith('/assinatura/')) {
+    return NextResponse.next();
+  }
+
+  if (isPublicPath) {
     return NextResponse.next();
   }
 
@@ -21,32 +39,44 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  // Verificar permissões para rotas do dashboard
-  const module = getModuleFromPath(pathname);
-  const action = getActionFromPath(pathname);
+  // Rotas que requerem permissões específicas
+  const protectedRoutes = {
+    '/financeiro': { module: 'financial', action: 'view' },
+    '/comercial': { module: 'commercial', action: 'view' },
+    '/marketing': { module: 'marketing', action: 'view' },
+    '/administrativo': { module: 'admin', action: 'view' },
+    '/seguranca': { module: 'security', action: 'view' },
+    '/configuracoes': { module: 'settings', action: 'view' },
+    '/media': { module: 'media', action: 'view' },
+    '/documentos': { module: 'signature', action: 'view' },
+    '/qrcode': { module: 'media', action: 'view' },
+  };
 
-  // ADM Master tem acesso total
-  if (token.role !== 'ADM Master') {
-    const hasAccess = await hasPermission(request, module, action);
-    if (!hasAccess) {
-      return new NextResponse(
-        JSON.stringify({ error: 'Acesso negado. Você não tem permissão para acessar este módulo.' }),
-        {
-          status: 403,
-          headers: { 'Content-Type': 'application/json' },
-        }
+  // Verificar permissão para rotas protegidas
+  for (const [route, permission] of Object.entries(protectedRoutes)) {
+    if (pathname.startsWith(route)) {
+      const userPermissions = token.permissions as string[] || [];
+
+      // ADM Master tem acesso total
+      if (token.role === 'ADM Master') {
+        return NextResponse.next();
+      }
+
+      const hasPermission = userPermissions.includes(
+        `${permission.module}:${permission.action}`
       );
+
+      if (!hasPermission) {
+        return NextResponse.redirect(new URL('/', request.url));
+      }
     }
   }
-
-  // Registrar acesso (audit log)
-  // TODO: Implementar registro de auditoria
 
   return NextResponse.next();
 }
 
 export const config = {
   matcher: [
-    '/((?!api/auth|_next/static|_next/image|favicon.ico|logo.svg).*)',
+    '/((?!api/auth|_next/static|_next/image|favicon.ico|logo.svg|media).*)',
   ],
 };
