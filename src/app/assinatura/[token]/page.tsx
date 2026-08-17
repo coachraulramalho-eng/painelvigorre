@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
+import Link from 'next/link';
 import { SignaturePad } from '@/components/signature/SignaturePad';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { 
@@ -15,7 +16,6 @@ import {
   AlertTriangle,
   Home
 } from 'lucide-react';
-import Link from 'next/link';
 
 interface SignatureStatus {
   id: string;
@@ -26,6 +26,8 @@ interface SignatureStatus {
   status: 'pending' | 'viewed' | 'signed' | 'declined' | 'expired' | 'cancelled';
   expiresAt?: string;
   createdAt: string;
+  signatureDate?: string;
+  notes?: string;
   document: {
     fileUrl: string;
     company?: { name: string };
@@ -213,7 +215,7 @@ export default function SignaturePage() {
               {status.signerName}, você assinou <strong>{status.documentTitle}</strong>
             </p>
             <p className="text-sm text-muted-foreground mt-1">
-              Assinado em {status.signatureDate ? new Date(status.signatureDate).toLocaleString('pt-BR') : ''}
+              Assinado em {status.signatureDate ? new Date(status.signatureDate).toLocaleString('pt-BR') : 'agora'}
             </p>
             <Button className="w-full mt-4" asChild>
               <Link href="/">
@@ -270,8 +272,8 @@ export default function SignaturePage() {
 
         {/* Success Message */}
         {success && (
-          <Alert variant="success" className="mb-6">
-            <CheckCircle className="h-4 w-4" />
+          <Alert className="mb-6 border-green-500 bg-green-50 text-green-700">
+            <CheckCircle className="h-4 w-4 text-green-500" />
             <AlertTitle>Sucesso!</AlertTitle>
             <AlertDescription>{success}</AlertDescription>
           </Alert>
