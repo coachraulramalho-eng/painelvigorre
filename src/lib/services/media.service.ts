@@ -111,8 +111,9 @@ export const uploadMediaFile = async (
       )
       .toBuffer();
     
+    // Salvar a imagem redimensionada (sobrescrever)
+    fs.writeFileSync(filepath, resized);
     processedBuffer = resized;
-    fs.writeFileSync(filepath, processedBuffer);
   }
 
   // Gerar thumbnail se for imagem
