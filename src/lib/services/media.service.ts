@@ -5,7 +5,9 @@ import path from 'path';
 import sharp from 'sharp';
 
 // ========== TIPOS ==========
-interface MediaFile {
+export type MediaType = 'image' | 'video' | 'document' | 'other';
+
+export interface MediaFile {
   id: string;
   name: string;
   originalName: string;
@@ -13,7 +15,7 @@ interface MediaFile {
   size: number;
   url: string;
   thumbnailUrl: string | null;
-  type: 'image' | 'video' | 'document' | 'other';
+  type: MediaType;
   category: string;
   tags: string[];
   description: string | null;
@@ -149,7 +151,8 @@ export const uploadMediaFile = async (
     },
   });
 
-  return media;
+  // Retornar com tipagem correta
+  return media as MediaFile;
 };
 
 export const uploadMultipleMedia = async (
@@ -197,7 +200,7 @@ export const generateThumbnail = async (
 };
 
 // ========== DETECÇÃO ==========
-const detectMediaType = (mimeType: string): MediaFile['type'] => {
+const detectMediaType = (mimeType: string): MediaType => {
   if (mimeType.startsWith('image/')) return 'image';
   if (mimeType.startsWith('video/')) return 'video';
   if (mimeType === 'application/pdf') return 'document';
@@ -208,7 +211,7 @@ const detectMediaType = (mimeType: string): MediaFile['type'] => {
 
 // ========== CRUD ==========
 export const getMediaById = async (id: string): Promise<MediaFile | null> => {
-  return prisma.media.findUnique({
+  const media = await prisma.media.findUnique({
     where: { id },
     include: {
       uploadedByUser: {
@@ -227,10 +230,11 @@ export const getMediaById = async (id: string): Promise<MediaFile | null> => {
       },
     },
   });
+  return media as MediaFile | null;
 };
 
 export const getMediaByCategory = async (category: string): Promise<MediaFile[]> => {
-  return prisma.media.findMany({
+  const media = await prisma.media.findMany({
     where: { category },
     include: {
       uploadedByUser: {
@@ -250,10 +254,11 @@ export const getMediaByCategory = async (category: string): Promise<MediaFile[]>
     },
     orderBy: { createdAt: 'desc' },
   });
+  return media as MediaFile[];
 };
 
 export const getMediaByTags = async (tags: string[]): Promise<MediaFile[]> => {
-  return prisma.media.findMany({
+  const media = await prisma.media.findMany({
     where: {
       tags: {
         hasSome: tags,
@@ -277,10 +282,11 @@ export const getMediaByTags = async (tags: string[]): Promise<MediaFile[]> => {
     },
     orderBy: { createdAt: 'desc' },
   });
+  return media as MediaFile[];
 };
 
 export const getMediaByCampaign = async (campaignId: string): Promise<MediaFile[]> => {
-  return prisma.media.findMany({
+  const media = await prisma.media.findMany({
     where: { campaignId },
     include: {
       uploadedByUser: {
@@ -300,6 +306,7 @@ export const getMediaByCampaign = async (campaignId: string): Promise<MediaFile[
     },
     orderBy: { createdAt: 'desc' },
   });
+  return media as MediaFile[];
 };
 
 export const deleteMedia = async (id: string): Promise<boolean> => {
@@ -337,7 +344,7 @@ export const updateMedia = async (
   id: string,
   data: Partial<Pick<MediaFile, 'name' | 'description' | 'tags' | 'category'>>
 ): Promise<MediaFile | null> => {
-  return prisma.media.update({
+  const media = await prisma.media.update({
     where: { id },
     data,
     include: {
@@ -357,6 +364,7 @@ export const updateMedia = async (
       },
     },
   });
+  return media as MediaFile | null;
 };
 
 // ========== ESTATÍSTICAS ==========
@@ -379,7 +387,7 @@ export const getMediaStats = async () => {
   return {
     total,
     totalSizeMB: totalSize._sum.size ? (totalSize._sum.size / 1024 / 1024).toFixed(2) : 0,
-    byType: byType.map(item => ({ type: item.type, count: item._count })),
+    byType: byType.map(item => ({ type: item.type as MediaType, count: item._count })),
     byCategory: byCategory.map(item => ({ category: item.category, count: item._count })),
   };
 };
@@ -443,5 +451,5 @@ export const searchMedia = async (
     prisma.media.count({ where }),
   ]);
 
-  return { items, total };
+  return { items: items as MediaFile[], total };
 };
