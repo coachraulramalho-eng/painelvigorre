@@ -104,9 +104,11 @@ export default function DocumentosPage() {
         description="Gerencie todos os documentos da Vigorre"
         badge={`${documents.length} documentos`}
         actions={
-          <Button className="gap-2">
-            <Plus className="h-4 w-4" />
-            Novo Documento
+          <Button asChild className="gap-2">
+            <Link href="/documentos/novo">
+              <Plus className="h-4 w-4" />
+              Novo Documento
+            </Link>
           </Button>
         }
       />
