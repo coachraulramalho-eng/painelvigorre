@@ -1,8 +1,9 @@
-import NextAuth, { type NextAuthOptions } from 'next-auth';
+import NextAuth, { type NextAuthConfig } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
-import { PrismaAdapter } from '@next-auth/prisma-adapter';
+import { PrismaAdapter } from '@auth/prisma-adapter';
 import { prisma } from '@/lib/db/prisma';
 import { compare } from 'bcryptjs';
+import { Adapter } from 'next-auth/adapters';
 
 declare module 'next-auth' {
   interface User {
@@ -20,11 +21,11 @@ declare module 'next-auth' {
   }
 }
 
-export const authOptions: NextAuthOptions = {
-  adapter: PrismaAdapter(prisma),
+export const authConfig: NextAuthConfig = {
+  adapter: PrismaAdapter(prisma) as Adapter,
   session: {
     strategy: 'jwt',
-    maxAge: 8 * 60 * 60, // 8 horas
+    maxAge: 8 * 60 * 60,
   },
   pages: {
     signIn: '/login',
@@ -42,7 +43,7 @@ export const authOptions: NextAuthOptions = {
         }
 
         const user = await prisma.user.findUnique({
-          where: { email: credentials.email },
+          where: { email: credentials.email as string },
           include: {
             roles: {
               include: {
@@ -64,7 +65,7 @@ export const authOptions: NextAuthOptions = {
           return null;
         }
 
-        const isValid = await compare(credentials.password, user.password);
+        const isValid = await compare(credentials.password as string, user.password);
 
         if (!isValid) {
           return null;
@@ -74,7 +75,6 @@ export const authOptions: NextAuthOptions = {
           return null;
         }
 
-        // Atualizar último login
         await prisma.user.update({
           where: { id: user.id },
           data: {
@@ -82,7 +82,6 @@ export const authOptions: NextAuthOptions = {
           },
         });
 
-        // Extrair permissões
         const permissions = user.roles.flatMap((userRole) =>
           userRole.role.permissions.map((rp) => rp.permission)
         );
@@ -117,4 +116,9 @@ export const authOptions: NextAuthOptions = {
   },
 };
 
-export const { handlers, auth, signIn, signOut } = NextAuth(authOptions);
+export const { handlers, auth, signIn, signOut } = NextAuth(authConfig);
+
+export async function getServerSession() {
+  const { auth } = await import('@/lib/auth/auth');
+  return auth();
+}
