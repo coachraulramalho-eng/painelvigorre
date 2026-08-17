@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
+import { getToken } from 'next-auth/jwt';
 
 export class ApiError extends Error {
   constructor(
@@ -35,7 +37,7 @@ export const handleApiError = (error: unknown) => {
 };
 
 export const withAuth = async (
-  request: Request,
+  request: NextRequest,
   handler: (token: any) => Promise<Response>
 ) => {
   const token = await getToken({ req: request as any });
@@ -51,7 +53,7 @@ export const withAuth = async (
 };
 
 export const withPermissions = async (
-  request: Request,
+  request: NextRequest,
   requiredPermissions: { module: string; action: string }[],
   handler: (token: any) => Promise<Response>
 ) => {
