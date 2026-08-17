@@ -1,0 +1,707 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ========== USUÁRIOS E PERMISSÕES ==========
+model User {
+  id                String          @id @default(cuid())
+  name              String
+  email             String          @unique
+  password          String
+  twoFactorSecret   String?         @map("two_factor_secret")
+  twoFactorEnabled  Boolean         @default(false) @map("two_factor_enabled")
+  active            Boolean         @default(true)
+  lastLoginAt       DateTime?       @map("last_login_at")
+  lastLoginIp       String?         @map("last_login_ip")
+  createdAt         DateTime        @default(now()) @map("created_at")
+  updatedAt         DateTime        @updatedAt @map("updated_at")
+
+  roles             UserRole[]
+  representatives   Representative[]
+  employees         Employee[]
+  auditLogs         AuditLog[]
+  leadsResponsible  Lead[]          @relation("LeadResponsible")
+  leadsRepresentative Lead[]        @relation("LeadRepresentative")
+  activities        Activity[]
+  tasks             Task[]
+  opportunities     Opportunity[]   @relation("OpportunityResponsible")
+  proposals         Proposal[]      @relation("ProposalResponsible")
+  proposalApprovals ProposalApproval[]
+
+  @@map("users")
+}
+
+model Role {
+  id          String              @id @default(cuid())
+  name        String              @unique
+  description String?
+  isMaster    Boolean             @default(false) @map("is_master")
+  createdAt   DateTime            @default(now()) @map("created_at")
+  updatedAt   DateTime            @updatedAt @map("updated_at")
+
+  users       UserRole[]
+  permissions RolePermission[]
+
+  @@map("roles")
+}
+
+model Permission {
+  id          String              @id @default(cuid())
+  module      String              // commercial, financial, marketing, admin, security, settings, dashboard
+  action      String              // view, create, edit, delete, approve, export
+  scope       String?             // all, own, team
+  description String?
+  createdAt   DateTime            @default(now()) @map("created_at")
+
+  roles       RolePermission[]
+
+  @@unique([module, action, scope])
+  @@map("permissions")
+}
+
+model UserRole {
+  userId      String              @map("user_id")
+  roleId      String              @map("role_id")
+  createdAt   DateTime            @default(now()) @map("created_at")
+
+  user        User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role        Role                @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@map("user_roles")
+}
+
+model RolePermission {
+  roleId        String            @map("role_id")
+  permissionId  String            @map("permission_id")
+  createdAt     DateTime          @default(now()) @map("created_at")
+
+  role          Role              @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission    Permission        @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+// ========== CRM - EMPRESAS E CONTATOS ==========
+model Company {
+  id              String            @id @default(cuid())
+  name            String
+  document        String?           @unique
+  phone           String?
+  email           String?
+  address         String?
+  city            String?
+  state           String?
+  segment         String?
+  website         String?
+  notes           String?
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
+
+  contacts        Contact[]
+  leads           Lead[]
+  opportunities   Opportunity[]
+  proposals       Proposal[]
+  contracts       Contract[]
+  payments        AccountReceivable[]
+  tasks           Task[]
+  documents       Document[]
+  activities      Activity[]
+  commercialAgreements CommercialAgreement[]
+
+  @@map("companies")
+}
+
+model Contact {
+  id              String            @id @default(cuid())
+  companyId       String            @map("company_id")
+  name            String
+  position        String?
+  phone           String?
+  email           String?
+  whatsapp        String?
+  isMain          Boolean           @default(false) @map("is_main")
+  notes           String?
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
+
+  company         Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  leads           Lead[]
+  opportunities   Opportunity[]
+  proposals       Proposal[]
+  activities      Activity[]
+
+  @@map("contacts")
+}
+
+// ========== CRM - LEADS ==========
+model Lead {
+  id              String            @id @default(cuid())
+  companyId       String            @map("company_id")
+  contactId       String?           @map("contact_id")
+  responsibleId   String            @map("responsible_id")
+  representativeId String?          @map("representative_id")
+  
+  name            String
+  phone           String?
+  whatsapp        String?
+  email           String?
+  city            String?
+  state           String?
+  segment         String?
+  origin          String
+  status          String
+  notes           String?
+  lostReasonId    String?           @map("lost_reason_id")
+  lostAt          DateTime?         @map("lost_at")
+  convertedAt     DateTime?         @map("converted_at")
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
+
+  company         Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  contact         Contact?          @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  responsible     User              @relation("LeadResponsible", fields: [responsibleId], references: [id])
+  representative  User?             @relation("LeadRepresentative", fields: [representativeId], references: [id], onDelete: SetNull)
+  lostReason      LostReason?       @relation(fields: [lostReasonId], references: [id], onDelete: SetNull)
+  
+  opportunities   Opportunity[]
+  activities      Activity[]
+  tasks           Task[]
+
+  @@map("leads")
+}
+
+model LostReason {
+  id              String            @id @default(cuid())
+  name            String            @unique
+  description     String?
+  createdAt       DateTime          @default(now()) @map("created_at")
+
+  leads           Lead[]
+  opportunities   Opportunity[]
+
+  @@map("lost_reasons")
+}
+
+// ========== CRM - ATIVIDADES ==========
+model Activity {
+  id              String            @id @default(cuid())
+  leadId          String?           @map("lead_id")
+  companyId       String?           @map("company_id")
+  contactId       String?           @map("contact_id")
+  opportunityId   String?           @map("opportunity_id")
+  proposalId      String?           @map("proposal_id")
+  responsibleId   String            @map("responsible_id")
+  
+  type            String
+  description     String
+  date            DateTime
+  nextStep        String?           @map("next_step")
+  nextDate        DateTime?         @map("next_date")
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
+
+  lead            Lead?             @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  company         Company?          @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  contact         Contact?          @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  opportunity     Opportunity?      @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
+  proposal        Proposal?         @relation(fields: [proposalId], references: [id], onDelete: SetNull)
+  responsible     User              @relation(fields: [responsibleId], references: [id])
+
+  @@map("activities")
+}
+
+// ========== OPORTUNIDADES ==========
+model Opportunity {
+  id              String            @id @default(cuid())
+  companyId       String            @map("company_id")
+  leadId          String?           @map("lead_id")
+  contactId       String?           @map("contact_id")
+  responsibleId   String            @map("responsible_id")
+  representativeId String?          @map("representative_id")
+  
+  title           String
+  description     String?
+  service         String
+  estimatedValue  Decimal?          @map("estimated_value") @db.Decimal(10, 2)
+  probability     Int?              // 0-100
+  expectedClose   DateTime?         @map("expected_close")
+  status          String
+  lostReasonId    String?           @map("lost_reason_id")
+  nextStep        String?           @map("next_step")
+  nextDate        DateTime?         @map("next_date")
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
+
+  company         Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  lead            Lead?             @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  contact         Contact?          @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  responsible     User              @relation("OpportunityResponsible", fields: [responsibleId], references: [id])
+  representative  User?             @relation("OpportunityRepresentative", fields: [representativeId], references: [id], onDelete: SetNull)
+  lostReason      LostReason?       @relation(fields: [lostReasonId], references: [id], onDelete: SetNull)
+  
+  proposals       Proposal[]
+  activities      Activity[]
+
+  @@map("opportunities")
+}
+
+// ========== PROPOSTAS ==========
+model Proposal {
+  id              String            @id @default(cuid())
+  number          String            @unique
+  companyId       String            @map("company_id")
+  opportunityId   String?           @map("opportunity_id")
+  contactId       String?           @map("contact_id")
+  responsibleId   String            @map("responsible_id")
+  representativeId String?          @map("representative_id")
+  
+  title           String
+  description     String?
+  service         String
+  quantity        Int?
+  unitPrice       Decimal?          @map("unit_price") @db.Decimal(10, 2)
+  totalValue      Decimal           @map("total_value") @db.Decimal(10, 2)
+  discount        Decimal?          @db.Decimal(10, 2)
+  finalValue      Decimal           @map("final_value") @db.Decimal(10, 2)
+  totalCost       Decimal?          @map("total_cost") @db.Decimal(10, 2)
+  margin          Decimal?          @db.Decimal(5, 2)
+  validity        DateTime?
+  executionDeadline DateTime?       @map("execution_deadline")
+  paymentCondition String?          @map("payment_condition")
+  notes           String?
+  status          String
+  approvedBy      String?           @map("approved_by")
+  approvedAt      DateTime?         @map("approved_at")
+  sentAt          DateTime?         @map("sent_at")
+  viewedAt        DateTime?         @map("viewed_at")
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
+
+  company         Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  opportunity     Opportunity?      @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
+  contact         Contact?          @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  responsible     User              @relation("ProposalResponsible", fields: [responsibleId], references: [id])
+  representative  User?             @relation("ProposalRepresentative", fields: [representativeId], references: [id], onDelete: SetNull)
+  
+  items           ProposalItem[]
+  costs           ProposalCost[]
+  approvals       ProposalApproval[]
+  installments    PaymentInstallment[]
+  contracts       Contract[]
+  paymentLinks    PaymentLink[]
+  activities      Activity[]
+  tasks           Task[]
+
+  @@map("proposals")
+}
+
+model ProposalItem {
+  id              String            @id @default(cuid())
+  proposalId      String            @map("proposal_id")
+  description     String
+  quantity        Int
+  unitPrice       Decimal           @map("unit_price") @db.Decimal(10, 2)
+  totalPrice      Decimal           @map("total_price") @db.Decimal(10, 2)
+  createdAt       DateTime          @default(now()) @map("created_at")
+
+  proposal        Proposal          @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+
+  @@map("proposal_items")
+}
+
+model ProposalCost {
+  id              String            @id @default(cuid())
+  proposalId      String            @map("proposal_id")
+  description     String
+  value           Decimal           @db.Decimal(10, 2)
+  createdAt       DateTime          @default(now()) @map("created_at")
+
+  proposal        Proposal          @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+
+  @@map("proposal_costs")
+}
+
+model ProposalApproval {
+  id              String            @id @default(cuid())
+  proposalId      String            @map("proposal_id")
+  userId          String            @map("user_id")
+  action          String
+  comment         String?
+  previousStatus  String            @map("previous_status")
+  newStatus       String            @map("new_status")
+  createdAt       DateTime          @default(now()) @map("created_at")
+
+  proposal        Proposal          @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+  user            User              @relation(fields: [userId], references: [id])
+
+  @@map("proposal_approvals")
+}
+
+// ========== REPRESENTANTES ==========
+model Representative {
+  id              String            @id @default(cuid())
+  userId          String            @unique @map("user_id")
+  type            String
+  document        String            @unique
+  phone           String?
+  email           String?
+  address         String?
+  region          String?
+  services        String?
+  bankData        String?           @map("bank_data")
+  pix             String?
+  contractFile    String?           @map("contract_file")
+  status          String
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
+
+  user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  agreements      CommercialAgreement[]
+  commissions     Commission[]
+
+  @@map("representatives")
+}
+
+model CommercialAgreement {
+  id              String            @id @default(cuid())
+  representativeId String           @map("representative_id")
+  companyId       String?           @map("company_id")
+  service         String
+  percentage      Decimal?          @db.Decimal(5, 2)
+  fixedValue      Decimal?          @map("fixed_value") @db.Decimal(10, 2)
+  calculationBase String            @map("calculation_base")
+  validityStart   DateTime          @map("validity_start")
+  validityEnd     DateTime?         @map("validity_end")
+  notes           String?
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
+
+  representative  Representative    @relation(fields: [representativeId], references: [id], onDelete: Cascade)
+  company         Company?          @relation(fields: [companyId], references: [id], onDelete: SetNull)
+
+  @@map("commercial_agreements")
+}
+
+model Commission {
+  id              String            @id @default(cuid())
+  representativeId String           @map("representative_id")
+  proposalId      String?           @map("proposal_id")
+  accountReceivableId String?       @map("account_receivable_id")
+  value           Decimal           @db.Decimal(10, 2)
+  status          String            // Prevista, Aprovada, Pendente, Paga
+  paymentDate     DateTime?         @map("payment_date")
+  notes           String?
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
+
+  representative  Representative    @relation(fields: [representativeId], references: [id], onDelete: Cascade)
+  proposal        Proposal?         @relation(fields: [proposalId], references: [id], onDelete: SetNull)
+  accountReceivable AccountReceivable? @relation(fields: [accountReceivableId], references: [id], onDelete: SetNull)
+
+  @@map("commissions")
+}
+
+// ========== CONTRATOS ==========
+model Contract {
+  id              String            @id @default(cuid())
+  proposalId      String?           @map("proposal_id")
+  companyId       String            @map("company_id")
+  title           String
+  value           Decimal           @db.Decimal(10, 2)
+  startDate       DateTime          @map("start_date")
+  endDate         DateTime?         @map("end_date")
+  renewalDate     DateTime?         @map("renewal_date")
+  responsibleId   String            @map("responsible_id")
+  fileUrl         String?           @map("file_url")
+  status          String
+  notes           String?
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
+
+  proposal        Proposal?         @relation(fields: [proposalId], references: [id], onDelete: SetNull)
+  company         Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  responsible     User              @relation(fields: [responsibleId], references: [id])
+
+  @@map("contracts")
+}
+
+// ========== FINANCEIRO ==========
+model AccountReceivable {
+  id              String            @id @default(cuid())
+  companyId       String            @map("company_id")
+  proposalId      String?           @map("proposal_id")
+  contractId      String?           @map("contract_id")
+  installmentId   String?           @map("installment_id")
+  description     String
+  value           Decimal           @db.Decimal(10, 2)
+  dueDate         DateTime          @map("due_date")
+  competenceDate  DateTime?         @map("competence_date")
+  paymentMethod   String?           @map("payment_method")
+  status          String
+  receivedAt      DateTime?         @map("received_at")
+  receivedValue   Decimal?          @map("received_value") @db.Decimal(10, 2)
+  notes           String?
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
+
+  company         Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  proposal        Proposal?         @relation(fields: [proposalId], references: [id], onDelete: SetNull)
+  contract        Contract?         @relation(fields: [contractId], references: [id], onDelete: SetNull)
+  installment     PaymentInstallment? @relation(fields: [installmentId], references: [id], onDelete: SetNull)
+  commissions     Commission[]
+
+  @@map("accounts_receivable")
+}
+
+model AccountPayable {
+  id              String            @id @default(cuid())
+  supplierId      String?           @map("supplier_id")
+  description     String
+  category        String?
+  costCenterId    String?           @map("cost_center_id")
+  value           Decimal           @db.Decimal(10, 2)
+  dueDate         DateTime          @map("due_date")
+  competenceDate  DateTime?         @map("competence_date")
+  paymentMethod   String?           @map("payment_method")
+  recurrence      String?           // Mensal, Anual, Único
+  document        String?           @map("document_url")
+  responsibleId   String?           @map("responsible_id")
+  status          String
+  paidAt          DateTime?         @map("paid_at")
+  paidValue       Decimal?          @map("paid_value") @db.Decimal(10, 2)
+  notes           String?
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
+
+  supplier        Supplier?         @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  costCenter      CostCenter?       @relation(fields: [costCenterId], references: [id], onDelete: SetNull)
+  responsible     User?             @relation(fields: [responsibleId], references: [id], onDelete: SetNull)
+
+  @@map("accounts_payable")
+}
+
+model PaymentInstallment {
+  id              String            @id @default(cuid())
+  proposalId      String            @map("proposal_id")
+  number          Int
+  value           Decimal           @db.Decimal(10, 2)
+  dueDate         DateTime          @map("due_date")
+  status          String
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
+
+  proposal        Proposal          @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+  paymentLinks    PaymentLink[]
+  accountReceivable AccountReceivable[]
+
+  @@map("payment_installments")
+}
+
+model PaymentLink {
+  id              String            @id @default(cuid())
+  proposalId      String            @map("proposal_id")
+  installmentId   String?           @map("installment_id")
+  url             String
+  method          String            // PIX, Boleto, Cartão
+  type            String            // À vista, Entrada, Parcela
+  status          String
+  sentAt          DateTime?         @map("sent_at")
+  viewedAt        DateTime?         @map("viewed_at")
+  paidAt          DateTime?         @map("paid_at")
+  expiresAt       DateTime?         @map("expires_at")
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
+
+  proposal        Proposal          @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+  installment     PaymentInstallment? @relation(fields: [installmentId], references: [id], onDelete: SetNull)
+
+  @@map("payment_links")
+}
+
+// ========== PLANILHAS E PRODUTOS ==========
+model Platform {
+  id              String            @id @default(cuid())
+  name            String
+  status          String            // Em desenvolvimento, Ativa, Pausada, Encerrada
+  responsibleId   String?           @map("responsible_id")
+  revenueType     String?           @map("revenue_type")
+  notes           String?
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
+
+  responsible     User?             @relation(fields: [responsibleId], references: [id], onDelete: SetNull)
+  revenues        Revenue[]
+
+  @@map("platforms")
+}
+
+model Revenue {
+  id              String            @id @default(cuid())
+  platformId      String            @map("platform_id")
+  date            DateTime
+  description     String
+  quantity        Int?
+  unitValue       Decimal?          @map("unit_value") @db.Decimal(10, 2)
+  totalValue      Decimal           @map("total_value") @db.Decimal(10, 2)
+  paymentMethod   String?           @map("payment_method")
+  status          String
+  notes           String?
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
+
+  platform        Platform          @relation(fields: [platformId], references: [id], onDelete: Cascade)
+
+  @@map("revenues")
+}
+
+// ========== CENTROS DE CUSTO ==========
+model CostCenter {
+  id              String            @id @default(cuid())
+  name            String            @unique
+  description     String?
+  parentId        String?           @map("parent_id")
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
+
+  parent          CostCenter?       @relation("CostCenterParent", fields: [parentId], references: [id])
+  children        CostCenter[]      @relation("CostCenterParent")
+  accountsPayable AccountPayable[]
+  budgets         Budget[]
+
+  @@map("cost_centers")
+}
+
+model Budget {
+  id              String            @id @default(cuid())
+  costCenterId    String            @map("cost_center_id")
+  period          String            // Mês, Ano
+  year            Int
+  month           Int?
+  plannedValue    Decimal           @map("planned_value") @db.Decimal(10, 2)
+  actualValue     Decimal?          @map("actual_value") @db.Decimal(10, 2)
+  notes           String?
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
+
+  costCenter      CostCenter        @relation(fields: [costCenterId], references: [id], onDelete: Cascade)
+
+  @@unique([costCenterId, period, year, month])
+  @@map("budgets")
+}
+
+// ========== ADMINISTRATIVO ==========
+model Employee {
+  id              String            @id @default(cuid())
+  userId          String            @unique @map("user_id")
+  cpf             String            @unique
+  phone           String?
+  position        String?
+  department      String?
+  employmentType  String?           @map("employment_type")
+  entryDate       DateTime?         @map("entry_date")
+  managerId       String?           @map("manager_id")
+  status          String
+  documents       String?           @map("documents_url")
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
+
+  user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  manager         Employee?         @relation("EmployeeManager", fields: [managerId], references: [id])
+
+  @@map("employees")
+}
+
+model Supplier {
+  id              String            @id @default(cuid())
+  name            String
+  document        String?           @unique
+  contact         String?
+  service         String?
+  paymentData     String?           @map("payment_data")
+  documents       String?           @map("documents_url")
+  status          String
+  notes           String?
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
+
+  accountsPayable AccountPayable[]
+
+  @@map("suppliers")
+}
+
+// ========== DOCUMENTOS ==========
+model Document {
+  id              String            @id @default(cuid())
+  title           String
+  category        String
+  fileUrl         String            @map("file_url")
+  version         String?
+  status          String
+  responsibleId   String            @map("responsible_id")
+  companyId       String?           @map("company_id")
+  proposalId      String?           @map("proposal_id")
+  contractId      String?           @map("contract_id")
+  notes           String?
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
+
+  responsible     User              @relation(fields: [responsibleId], references: [id])
+  company         Company?          @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  proposal        Proposal?         @relation(fields: [proposalId], references: [id], onDelete: SetNull)
+  contract        Contract?         @relation(fields: [contractId], references: [id], onDelete: SetNull)
+
+  @@map("documents")
+}
+
+// ========== TAREFAS ==========
+model Task {
+  id              String            @id @default(cuid())
+  title           String
+  description     String?
+  responsibleId   String            @map("responsible_id")
+  priority        String            // Alta, Média, Baixa
+  dueDate         DateTime          @map("due_date")
+  status          String
+  leadId          String?           @map("lead_id")
+  proposalId      String?           @map("proposal_id")
+  contractId      String?           @map("contract_id")
+  companyId       String?           @map("company_id")
+  completedAt     DateTime?         @map("completed_at")
+  notes           String?
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
+
+  responsible     User              @relation("UserTasks", fields: [responsibleId], references: [id])
+  lead            Lead?             @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  proposal        Proposal?         @relation(fields: [proposalId], references: [id], onDelete: SetNull)
+  contract        Contract?         @relation(fields: [contractId], references: [id], onDelete: SetNull)
+  company         Company?          @relation(fields: [companyId], references: [id], onDelete: SetNull)
+
+  @@map("tasks")
+}
+
+// ========== AUDITORIA ==========
+model AuditLog {
+  id              String            @id @default(cuid())
+  userId          String            @map("user_id")
+  action          String
+  module          String
+  recordId        String?           @map("record_id")
+  oldData         Json?             @map("old_data")
+  newData         Json?             @map("new_data")
+  ipAddress       String?           @map("ip_address")
+  userAgent       String?           @map("user_agent")
+  createdAt       DateTime          @default(now()) @map("created_at")
+
+  user            User              @relation("UserAuditLogs", fields: [userId], references: [id])
+
+  @@map("audit_logs")
+}
