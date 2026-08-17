@@ -4,29 +4,23 @@ import { prisma } from '@/lib/db/prisma';
 import { getToken } from 'next-auth/jwt';
 import { z } from 'zod';
 
-const updateLeadSchema = z.object({
-  name: z.string().min(2).optional(),
+const leadSchema = z.object({
+  companyId: z.string().optional(),
+  name: z.string().min(2, 'Nome é obrigatório'),
   phone: z.string().optional(),
   whatsapp: z.string().optional(),
-  email: z.string().email().optional(),
+  email: z.string().email('E-mail inválido').optional(),
   city: z.string().optional(),
   state: z.string().optional(),
   segment: z.string().optional(),
-  origin: z.string().optional(),
-  status: z.string().optional(),
+  origin: z.string().min(1, 'Origem é obrigatória'),
+  status: z.string().default('Novo'),
   notes: z.string().optional(),
   representativeId: z.string().optional(),
-  lostReasonId: z.string().optional(),
-  lostAt: z.string().optional(),
-  convertedAt: z.string().optional(),
 });
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function GET(request: NextRequest) {
   try {
-    const { id } = await params;
     const token = await getToken({ req: request as any });
     
     if (!token) {
@@ -36,15 +30,49 @@ export async function GET(
       );
     }
 
-    const lead = await prisma.lead.findUnique({
-      where: { id },
+    const { searchParams } = new URL(request.url);
+    const status = searchParams.get('status');
+    const origin = searchParams.get('origin');
+    const responsibleId = searchParams.get('responsibleId');
+    const search = searchParams.get('search');
+
+    const where: any = {};
+
+    if (status) where.status = status;
+    if (origin) where.origin = origin;
+
+    if (token.role !== 'ADM Master') {
+      const userPermissions = token.permissions as string[] || [];
+      
+      if (!userPermissions.includes('commercial:view:all')) {
+        where.OR = [
+          { responsibleId: token.id },
+          { representativeId: token.id },
+        ];
+      }
+    }
+
+    if (responsibleId) where.responsibleId = responsibleId;
+
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { email: { contains: search, mode: 'insensitive' } },
+        { phone: { contains: search } },
+        { company: { name: { contains: search, mode: 'insensitive' } } },
+      ];
+    }
+
+    const leads = await prisma.lead.findMany({
+      where,
       include: {
         company: {
-          include: {
-            contacts: true,
+          select: {
+            id: true,
+            name: true,
+            document: true,
           },
         },
-        contact: true,
         responsible: {
           select: {
             id: true,
@@ -59,69 +87,36 @@ export async function GET(
             email: true,
           },
         },
-        lostReason: true,
         opportunities: {
-          include: {
-            proposals: true,
-            activities: true,
-          },
-        },
-        activities: {
-          orderBy: {
-            date: 'desc',
-          },
-        },
-        tasks: {
-          orderBy: {
-            dueDate: 'asc',
+          select: {
+            id: true,
+            title: true,
+            status: true,
           },
         },
         _count: {
           select: {
             activities: true,
-            tasks: true,
-            opportunities: true,
           },
         },
       },
+      orderBy: {
+        createdAt: 'desc',
+      },
     });
 
-    if (!lead) {
-      return NextResponse.json(
-        { error: 'Lead não encontrado' },
-        { status: 404 }
-      );
-    }
-
-    if (token.role !== 'ADM Master') {
-      const userPermissions = token.permissions as string[] || [];
-      
-      if (!userPermissions.includes('commercial:view:all')) {
-        if (lead.responsibleId !== token.id && lead.representativeId !== token.id) {
-          return NextResponse.json(
-            { error: 'Sem permissão para visualizar este lead' },
-            { status: 403 }
-          );
-        }
-      }
-    }
-
-    return NextResponse.json(lead);
+    return NextResponse.json(leads);
   } catch (error) {
-    console.error('Erro ao buscar lead:', error);
+    console.error('Erro ao buscar leads:', error);
     return NextResponse.json(
-      { error: 'Erro ao buscar lead' },
+      { error: 'Erro ao buscar leads' },
       { status: 500 }
     );
   }
 }
 
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function POST(request: NextRequest) {
   try {
-    const { id } = await params;
     const token = await getToken({ req: request as any });
     
     if (!token) {
@@ -132,44 +127,62 @@ export async function PUT(
     }
 
     const body = await request.json();
-    const validatedData = updateLeadSchema.parse(body);
+    const validatedData = leadSchema.parse(body);
 
-    const existingLead = await prisma.lead.findUnique({
-      where: { id },
-    });
-
-    if (!existingLead) {
+    const userPermissions = token.permissions as string[] || [];
+    if (token.role !== 'ADM Master' && !userPermissions.includes('commercial:create')) {
       return NextResponse.json(
-        { error: 'Lead não encontrado' },
-        { status: 404 }
+        { error: 'Sem permissão para criar leads' },
+        { status: 403 }
       );
     }
 
-    if (token.role !== 'ADM Master') {
-      const userPermissions = token.permissions as string[] || [];
-      
-      if (!userPermissions.includes('commercial:edit:all')) {
-        if (existingLead.responsibleId !== token.id) {
-          return NextResponse.json(
-            { error: 'Sem permissão para editar este lead' },
-            { status: 403 }
-          );
-        }
+    let responsibleId = validatedData.representativeId || token.id;
+    
+    if (token.role === 'Representante') {
+      responsibleId = token.id;
+    }
+
+    let companyId = validatedData.companyId;
+    
+    if (!companyId) {
+      const existingCompany = await prisma.company.findFirst({
+        where: {
+          name: validatedData.name,
+        },
+      });
+
+      if (existingCompany) {
+        companyId = existingCompany.id;
+      } else {
+        const newCompany = await prisma.company.create({
+          data: {
+            name: validatedData.name,
+            segment: validatedData.segment,
+            city: validatedData.city,
+            state: validatedData.state,
+          },
+        });
+        companyId = newCompany.id;
       }
     }
 
-    const updateData: any = { ...validatedData };
-
-    if (validatedData.lostAt) {
-      updateData.lostAt = new Date(validatedData.lostAt);
-    }
-    if (validatedData.convertedAt) {
-      updateData.convertedAt = new Date(validatedData.convertedAt);
-    }
-
-    const updatedLead = await prisma.lead.update({
-      where: { id },
-      data: updateData,
+    const lead = await prisma.lead.create({
+      data: {
+        companyId,
+        name: validatedData.name,
+        phone: validatedData.phone,
+        whatsapp: validatedData.whatsapp,
+        email: validatedData.email,
+        city: validatedData.city,
+        state: validatedData.state,
+        segment: validatedData.segment,
+        origin: validatedData.origin,
+        status: validatedData.status,
+        notes: validatedData.notes,
+        responsibleId: responsibleId,
+        representativeId: validatedData.representativeId || null,
+      },
       include: {
         company: {
           select: {
@@ -195,17 +208,16 @@ export async function PUT(
     await prisma.auditLog.create({
       data: {
         userId: token.id as string,
-        action: 'UPDATE',
+        action: 'CREATE',
         module: 'commercial',
-        recordId: id,
-        oldData: existingLead,
-        newData: updatedLead,
+        recordId: lead.id,
+        newData: lead,
         ipAddress: request.headers.get('x-forwarded-for') || '',
         userAgent: request.headers.get('user-agent') || '',
       },
     });
 
-    return NextResponse.json(updatedLead);
+    return NextResponse.json(lead, { status: 201 });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
@@ -214,81 +226,9 @@ export async function PUT(
       );
     }
 
-    console.error('Erro ao atualizar lead:', error);
+    console.error('Erro ao criar lead:', error);
     return NextResponse.json(
-      { error: 'Erro ao atualizar lead' },
-      { status: 500 }
-    );
-  }
-}
-
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const { id } = await params;
-    const token = await getToken({ req: request as any });
-    
-    if (!token) {
-      return NextResponse.json(
-        { error: 'Não autenticado' },
-        { status: 401 }
-      );
-    }
-
-    if (token.role !== 'ADM Master') {
-      return NextResponse.json(
-        { error: 'Sem permissão para excluir leads' },
-        { status: 403 }
-      );
-    }
-
-    const existingLead = await prisma.lead.findUnique({
-      where: { id },
-    });
-
-    if (!existingLead) {
-      return NextResponse.json(
-        { error: 'Lead não encontrado' },
-        { status: 404 }
-      );
-    }
-
-    const hasRelations = await prisma.opportunity.findFirst({
-      where: { leadId: id },
-    });
-
-    if (hasRelations) {
-      return NextResponse.json(
-        { error: 'Não é possível excluir lead com oportunidades vinculadas' },
-        { status: 400 }
-      );
-    }
-
-    await prisma.lead.delete({
-      where: { id },
-    });
-
-    await prisma.auditLog.create({
-      data: {
-        userId: token.id as string,
-        action: 'DELETE',
-        module: 'commercial',
-        recordId: id,
-        oldData: existingLead,
-        ipAddress: request.headers.get('x-forwarded-for') || '',
-        userAgent: request.headers.get('user-agent') || '',
-      },
-    });
-
-    return NextResponse.json(
-      { message: 'Lead excluído com sucesso' }
-    );
-  } catch (error) {
-    console.error('Erro ao excluir lead:', error);
-    return NextResponse.json(
-      { error: 'Erro ao excluir lead' },
+      { error: 'Erro ao criar lead' },
       { status: 500 }
     );
   }
