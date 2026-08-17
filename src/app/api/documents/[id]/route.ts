@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
 import { getToken } from 'next-auth/jwt';
 import { prisma } from '@/lib/db/prisma';
 import fs from 'fs';
@@ -7,10 +8,11 @@ import path from 'path';
 const DOCUMENT_DIR = path.join(process.cwd(), 'public', 'documents');
 
 export async function GET(
-  request: Request,
-  { params }: { params: { id: string } }
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const token = await getToken({ req: request as any });
     
     if (!token) {
@@ -21,7 +23,7 @@ export async function GET(
     }
 
     const document = await prisma.document.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         responsible: {
           select: {
@@ -71,7 +73,6 @@ export async function GET(
       );
     }
 
-    // Verificar permissão
     if (token.role !== 'ADM Master') {
       const userPermissions = token.permissions as string[] || [];
       if (!userPermissions.includes('signature:view:all')) {
@@ -98,10 +99,11 @@ export async function GET(
 }
 
 export async function PUT(
-  request: Request,
-  { params }: { params: { id: string } }
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const token = await getToken({ req: request as any });
     
     if (!token) {
@@ -114,9 +116,8 @@ export async function PUT(
     const body = await request.json();
     const { title, category, status, notes, version } = body;
 
-    // Verificar se documento existe
     const existingDocument = await prisma.document.findUnique({
-      where: { id: params.id },
+      where: { id },
     });
 
     if (!existingDocument) {
@@ -126,7 +127,6 @@ export async function PUT(
       );
     }
 
-    // Verificar permissão
     if (token.role !== 'ADM Master') {
       if (existingDocument.responsibleId !== token.id) {
         return NextResponse.json(
@@ -137,7 +137,7 @@ export async function PUT(
     }
 
     const document = await prisma.document.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         title: title || existingDocument.title,
         category: category || existingDocument.category,
@@ -156,13 +156,12 @@ export async function PUT(
       },
     });
 
-    // Registrar auditoria
     await prisma.auditLog.create({
       data: {
         userId: token.id as string,
         action: 'UPDATE',
         module: 'document',
-        recordId: params.id,
+        recordId: id,
         oldData: existingDocument,
         newData: document,
         ipAddress: request.headers.get('x-forwarded-for') || '',
@@ -184,10 +183,11 @@ export async function PUT(
 }
 
 export async function DELETE(
-  request: Request,
-  { params }: { params: { id: string } }
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const token = await getToken({ req: request as any });
     
     if (!token) {
@@ -197,9 +197,8 @@ export async function DELETE(
       );
     }
 
-    // Verificar se documento existe
     const existingDocument = await prisma.document.findUnique({
-      where: { id: params.id },
+      where: { id },
     });
 
     if (!existingDocument) {
@@ -209,7 +208,6 @@ export async function DELETE(
       );
     }
 
-    // Verificar permissão (apenas ADM Master pode excluir)
     if (token.role !== 'ADM Master') {
       return NextResponse.json(
         { error: 'Apenas ADM Master pode excluir documentos' },
@@ -217,9 +215,8 @@ export async function DELETE(
       );
     }
 
-    // Verificar se há assinaturas
     const signatureRequests = await prisma.signatureRequest.findMany({
-      where: { documentId: params.id },
+      where: { documentId: id },
     });
 
     if (signatureRequests.length > 0) {
@@ -229,24 +226,21 @@ export async function DELETE(
       );
     }
 
-    // Deletar arquivo físico
     const filepath = path.join(DOCUMENT_DIR, path.basename(existingDocument.fileUrl));
     if (fs.existsSync(filepath)) {
       fs.unlinkSync(filepath);
     }
 
-    // Deletar registro
     await prisma.document.delete({
-      where: { id: params.id },
+      where: { id },
     });
 
-    // Registrar auditoria
     await prisma.auditLog.create({
       data: {
         userId: token.id as string,
         action: 'DELETE',
         module: 'document',
-        recordId: params.id,
+        recordId: id,
         oldData: existingDocument,
         ipAddress: request.headers.get('x-forwarded-for') || '',
         userAgent: request.headers.get('user-agent') || '',
