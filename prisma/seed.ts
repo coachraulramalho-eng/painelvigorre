@@ -6,14 +6,22 @@ const prisma = new PrismaClient();
 async function main() {
   console.log('🌱 Iniciando seed...');
 
-  // 1. Criar permissões
-  const modules = ['dashboard', 'commercial', 'financial', 'marketing', 'admin', 'security', 'settings'];
-  const actions = ['view', 'create', 'edit', 'delete', 'approve', 'export'];
+  // 1. Criar permissões (incluindo novas)
+  const modules = [
+    'dashboard', 'commercial', 'financial', 'marketing', 
+    'admin', 'security', 'settings', 'media', 'signature'
+  ];
+  
+  const actions = ['view', 'create', 'edit', 'delete', 'approve', 'export', 'upload', 'sign'];
   const scopes = ['all', 'own', 'team'];
 
   const permissions = [];
   for (const module of modules) {
     for (const action of actions) {
+      // Pular combinações inválidas
+      if (action === 'upload' && !['media', 'signature'].includes(module)) continue;
+      if (action === 'sign' && module !== 'signature') continue;
+
       permissions.push(
         prisma.permission.upsert({
           where: {
@@ -95,7 +103,36 @@ async function main() {
 
   console.log('✅ Usuário ADM Master criado: admin@vigorre.com / admin123');
 
-  // 4. Criar perfis padrão com permissões básicas
+  // 4. Criar categorias de mídia padrão
+  const mediaCategories = [
+    { name: 'logos', description: 'Logos da empresa' },
+    { name: 'banners', description: 'Banners para campanhas' },
+    { name: 'produtos', description: 'Imagens de produtos e serviços' },
+    { name: 'equipe', description: 'Fotos da equipe' },
+    { name: 'eventos', description: 'Fotos de eventos' },
+    { name: 'documentos', description: 'Documentos internos' },
+  ];
+
+  // 5. Criar motivos de perda padrão
+  const lostReasons = [
+    'Preço',
+    'Concorrente',
+    'Falta de orçamento',
+    'Decisão interna',
+    'Prazo',
+    'Não era prioridade',
+    'Outro',
+  ];
+
+  for (const reason of lostReasons) {
+    await prisma.lostReason.upsert({
+      where: { name: reason },
+      update: {},
+      create: { name: reason },
+    });
+  }
+  console.log('✅ Motivos de perda criados');
+
   console.log('✅ Seed concluído!');
 }
 
