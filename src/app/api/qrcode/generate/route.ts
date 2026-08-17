@@ -9,26 +9,11 @@ import {
   generatePaymentQRCodeWithLogo,
   generateProposalQRCodeWithLogo,
   generateContractQRCodeWithLogo,
+  generateDocumentQRCodeWithLogo,
+  generateLeadQRCodeWithLogo,
+  getLogoBase64,
   validateQRCodeData,
-  overlayLogo,
 } from '@/lib/services/qrcode.service';
-import fs from 'fs';
-import path from 'path';
-
-const LOGO_PATH = path.join(process.cwd(), 'public', 'logo-vigorre-qr.png');
-
-// Função para obter logo base64
-const getLogoBase64 = (): string | undefined => {
-  try {
-    if (fs.existsSync(LOGO_PATH)) {
-      const buffer = fs.readFileSync(LOGO_PATH);
-      return `data:image/png;base64,${buffer.toString('base64')}`;
-    }
-    return undefined;
-  } catch {
-    return undefined;
-  }
-};
 
 export async function POST(request: Request) {
   try {
@@ -68,7 +53,12 @@ export async function POST(request: Request) {
             data.client,
             logoBase64
           );
-          metadata = { type: 'payment', client: data.client, value: data.value, hasLogo: !!logoBase64 };
+          metadata = { 
+            type: 'payment', 
+            client: data.client, 
+            value: data.value, 
+            hasLogo: !!logoBase64 
+          };
           break;
 
         case 'proposal':
@@ -77,7 +67,12 @@ export async function POST(request: Request) {
             data.number,
             logoBase64
           );
-          metadata = { type: 'proposal', id: data.id, number: data.number, hasLogo: !!logoBase64 };
+          metadata = { 
+            type: 'proposal', 
+            id: data.id, 
+            number: data.number, 
+            hasLogo: !!logoBase64 
+          };
           break;
 
         case 'contract':
@@ -86,49 +81,40 @@ export async function POST(request: Request) {
             data.title,
             logoBase64
           );
-          metadata = { type: 'contract', id: data.id, title: data.title, hasLogo: !!logoBase64 };
+          metadata = { 
+            type: 'contract', 
+            id: data.id, 
+            title: data.title, 
+            hasLogo: !!logoBase64 
+          };
           break;
 
         case 'document':
-          const documentData = JSON.stringify({
-            type: 'document',
-            id: data.id,
-            title: data.title,
-            url: `${process.env.NEXTAUTH_URL}/documentos/${data.id}`,
-          });
-          qrCode = await generateQRCodeWithLogo(documentData, logoBase64, {
-            width: 280,
-            color: {
-              dark: '#0B2B4A',
-              light: '#FFFFFF',
-            },
-            logo: {
-              size: 70,
-              margin: 6,
-            },
-          });
-          metadata = { type: 'document', id: data.id, title: data.title, hasLogo: !!logoBase64 };
+          qrCode = await generateDocumentQRCodeWithLogo(
+            data.id,
+            data.title,
+            logoBase64
+          );
+          metadata = { 
+            type: 'document', 
+            id: data.id, 
+            title: data.title, 
+            hasLogo: !!logoBase64 
+          };
           break;
 
         case 'lead':
-          const leadData = JSON.stringify({
-            type: 'lead',
-            id: data.id,
-            name: data.name,
-            url: `${process.env.NEXTAUTH_URL}/comercial/crm/${data.id}`,
-          });
-          qrCode = await generateQRCodeWithLogo(leadData, logoBase64, {
-            width: 280,
-            color: {
-              dark: '#0B2B4A',
-              light: '#FFFFFF',
-            },
-            logo: {
-              size: 70,
-              margin: 6,
-            },
-          });
-          metadata = { type: 'lead', id: data.id, name: data.name, hasLogo: !!logoBase64 };
+          qrCode = await generateLeadQRCodeWithLogo(
+            data.id,
+            data.name,
+            logoBase64
+          );
+          metadata = { 
+            type: 'lead', 
+            id: data.id, 
+            name: data.name, 
+            hasLogo: !!logoBase64 
+          };
           break;
 
         default:
@@ -156,7 +142,7 @@ export async function POST(request: Request) {
       }
     }
 
-    // Registrar no banco
+    // Registrar no banco (opcional)
     try {
       await prisma.qRCode.create({
         data: {
