@@ -123,6 +123,15 @@ export async function GET(request: NextRequest) {
       });
     }
 
+    // Calcular resultado com valores seguros
+    const totalPaidValue = totalPaid._sum.value ?? 0;
+    const totalPaidExpensesValue = totalPaidExpenses._sum.value ?? 0;
+    const totalReceivableValue = totalReceivable._sum.value ?? 0;
+    const totalPayableValue = totalPayable._sum.value ?? 0;
+    const totalCommissionsValue = totalCommissions._sum.value ?? 0;
+
+    const result = totalPaidValue - totalPaidExpensesValue;
+
     return NextResponse.json({
       success: true,
       metrics: {
@@ -146,24 +155,24 @@ export async function GET(request: NextRequest) {
         },
         financial: {
           receivable: {
-            total: totalReceivable._sum.value || 0,
+            total: totalReceivableValue,
             overdue: overdueReceivables,
           },
           paid: {
-            total: totalPaid._sum.value || 0,
+            total: totalPaidValue,
           },
           payable: {
-            total: totalPayable._sum.value || 0,
+            total: totalPayableValue,
             overdue: overduePayables,
           },
           expenses: {
-            total: totalPaidExpenses._sum.value || 0,
+            total: totalPaidExpensesValue,
           },
-          result: (totalPaid._sum.value || 0) - (totalPaidExpenses._sum.value || 0),
+          result: result,
         },
         representatives: {
           total: representativesCount,
-          totalCommissions: totalCommissions._sum.value || 0,
+          totalCommissions: totalCommissionsValue,
           pendingCommissions,
         },
         contracts: {
