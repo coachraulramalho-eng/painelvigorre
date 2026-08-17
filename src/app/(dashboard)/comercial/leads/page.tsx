@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -47,9 +48,11 @@ export default function LeadsPage() {
           <h1 className="text-2xl font-bold text-primary">Leads</h1>
           <p className="text-muted-foreground">Gerencie todos os leads da Vigorre</p>
         </div>
-        <Button className="gap-2">
-          <Plus className="h-4 w-4" />
-          Novo Lead
+        <Button asChild className="gap-2">
+          <Link href="/comercial/leads/novo">
+            <Plus className="h-4 w-4" />
+            Novo Lead
+          </Link>
         </Button>
       </div>
 
