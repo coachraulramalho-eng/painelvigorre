@@ -1,13 +1,15 @@
 import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
 import { getToken } from 'next-auth/jwt';
 import { prisma } from '@/lib/db/prisma';
 import { getMediaById, deleteMedia, updateMedia } from '@/lib/services/media.service';
 
 export async function GET(
-  request: Request,
-  { params }: { params: { id: string } }
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const token = await getToken({ req: request as any });
     
     if (!token) {
@@ -17,7 +19,7 @@ export async function GET(
       );
     }
 
-    const media = await getMediaById(params.id);
+    const media = await getMediaById(id);
 
     if (!media) {
       return NextResponse.json(
@@ -40,10 +42,11 @@ export async function GET(
 }
 
 export async function PUT(
-  request: Request,
-  { params }: { params: { id: string } }
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const token = await getToken({ req: request as any });
     
     if (!token) {
@@ -56,7 +59,7 @@ export async function PUT(
     const body = await request.json();
     const { name, description, tags, category } = body;
 
-    const media = await updateMedia(params.id, {
+    const media = await updateMedia(id, {
       name,
       description,
       tags,
@@ -70,13 +73,12 @@ export async function PUT(
       );
     }
 
-    // Registrar auditoria
     await prisma.auditLog.create({
       data: {
         userId: token.id as string,
         action: 'UPDATE',
         module: 'media',
-        recordId: params.id,
+        recordId: id,
         newData: { name, description, tags, category },
       },
     });
@@ -95,10 +97,11 @@ export async function PUT(
 }
 
 export async function DELETE(
-  request: Request,
-  { params }: { params: { id: string } }
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const token = await getToken({ req: request as any });
     
     if (!token) {
@@ -108,7 +111,7 @@ export async function DELETE(
       );
     }
 
-    const success = await deleteMedia(params.id);
+    const success = await deleteMedia(id);
 
     if (!success) {
       return NextResponse.json(
@@ -117,13 +120,12 @@ export async function DELETE(
       );
     }
 
-    // Registrar auditoria
     await prisma.auditLog.create({
       data: {
         userId: token.id as string,
         action: 'DELETE',
         module: 'media',
-        recordId: params.id,
+        recordId: id,
       },
     });
 
