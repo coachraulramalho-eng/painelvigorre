@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getToken } from 'next-auth/jwt';
-import { uploadMediaFile } from '@/lib/services/media.service';
+import { uploadMediaFile, uploadMultipleMedia } from '@/lib/services/media.service';
 
 export async function POST(request: Request) {
   try {
@@ -14,31 +14,59 @@ export async function POST(request: Request) {
     }
 
     const formData = await request.formData();
-    const file = formData.get('file') as File;
+    const files = formData.getAll('files') as File[];
     const category = formData.get('category') as string || 'geral';
     const tags = JSON.parse(formData.get('tags') as string || '[]');
     const description = formData.get('description') as string;
     const campaignId = formData.get('campaignId') as string;
     const makeThumbnail = formData.get('makeThumbnail') !== 'false';
+    const resizeWidth = formData.get('resizeWidth') ? parseInt(formData.get('resizeWidth') as string) : undefined;
+    const resizeHeight = formData.get('resizeHeight') ? parseInt(formData.get('resizeHeight') as string) : undefined;
 
-    if (!file) {
+    if (!files || files.length === 0) {
       return NextResponse.json(
-        { error: 'Arquivo não enviado' },
+        { error: 'Nenhum arquivo enviado' },
         { status: 400 }
       );
     }
 
-    const media = await uploadMediaFile(file, token.id as string, {
+    const uploadOptions = {
       category,
       tags,
       description,
       campaignId,
       makeThumbnail,
-    });
+      resizeOptions: resizeWidth || resizeHeight ? {
+        width: resizeWidth,
+        height: resizeHeight,
+        fit: 'cover' as const,
+      } : undefined,
+    };
+
+    let results;
+
+    if (files.length === 1) {
+      const media = await uploadMediaFile(files[0], token.id as string, uploadOptions);
+      results = [media];
+    } else {
+      results = await uploadMultipleMedia(files, token.id as string, uploadOptions);
+    }
+
+    // Registrar auditoria
+    await prisma.auditLog.create({
+      data: {
+        userId: token.id as string,
+        action: 'CREATE',
+        module: 'media',
+        recordId: results[0]?.id || '',
+        newData: { count: results.length, category },
+      },
+    }).catch(() => {});
 
     return NextResponse.json({
       success: true,
-      media,
+      media: results,
+      count: results.length,
     });
   } catch (error) {
     console.error('Erro ao fazer upload:', error);
@@ -48,3 +76,5 @@ export async function POST(request: Request) {
     );
   }
 }
+
+import { prisma } from '@/lib/db/prisma';
