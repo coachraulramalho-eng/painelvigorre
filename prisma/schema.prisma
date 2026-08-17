@@ -8,7 +8,10 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
-// ========== USUÁRIOS E PERMISSÕES ==========
+// ============================================================
+// ========== USUÁRIOS E PERMISSÕES ===========================
+// ============================================================
+
 model User {
   id                String          @id @default(cuid())
   name              String
@@ -25,14 +28,23 @@ model User {
   roles             UserRole[]
   representatives   Representative[]
   employees         Employee[]
-  auditLogs         AuditLog[]
+  auditLogs         AuditLog[]      @relation("UserAuditLogs")
+  notifications     Notification[]
+  calendarEvents    CalendarEvent[]
+  
+  // Relacionamentos comerciais
   leadsResponsible  Lead[]          @relation("LeadResponsible")
   leadsRepresentative Lead[]        @relation("LeadRepresentative")
   activities        Activity[]
-  tasks             Task[]
+  tasks             Task[]          @relation("UserTasks")
   opportunities     Opportunity[]   @relation("OpportunityResponsible")
   proposals         Proposal[]      @relation("ProposalResponsible")
   proposalApprovals ProposalApproval[]
+  contracts         Contract[]      @relation("ContractResponsible")
+  documents         Document[]      @relation("DocumentResponsible")
+  
+  // Mídia
+  mediaUploads      Media[]         @relation("MediaUploader")
 
   @@map("users")
 }
@@ -53,8 +65,8 @@ model Role {
 
 model Permission {
   id          String              @id @default(cuid())
-  module      String              // commercial, financial, marketing, admin, security, settings, dashboard
-  action      String              // view, create, edit, delete, approve, export
+  module      String              // commercial, financial, marketing, admin, security, settings, dashboard, media, signature
+  action      String              // view, create, edit, delete, approve, export, upload, sign
   scope       String?             // all, own, team
   description String?
   createdAt   DateTime            @default(now()) @map("created_at")
@@ -89,7 +101,10 @@ model RolePermission {
   @@map("role_permissions")
 }
 
-// ========== CRM - EMPRESAS E CONTATOS ==========
+// ============================================================
+// ========== CRM - EMPRESAS E CONTATOS ======================
+// ============================================================
+
 model Company {
   id              String            @id @default(cuid())
   name            String
@@ -141,7 +156,10 @@ model Contact {
   @@map("contacts")
 }
 
-// ========== CRM - LEADS ==========
+// ============================================================
+// ========== CRM - LEADS =====================================
+// ============================================================
+
 model Lead {
   id              String            @id @default(cuid())
   companyId       String            @map("company_id")
@@ -174,6 +192,7 @@ model Lead {
   opportunities   Opportunity[]
   activities      Activity[]
   tasks           Task[]
+  qrCodes         QRCode[]          @relation("LeadQRCode")
 
   @@map("leads")
 }
@@ -190,7 +209,10 @@ model LostReason {
   @@map("lost_reasons")
 }
 
-// ========== CRM - ATIVIDADES ==========
+// ============================================================
+// ========== CRM - ATIVIDADES ================================
+// ============================================================
+
 model Activity {
   id              String            @id @default(cuid())
   leadId          String?           @map("lead_id")
@@ -218,7 +240,10 @@ model Activity {
   @@map("activities")
 }
 
-// ========== OPORTUNIDADES ==========
+// ============================================================
+// ========== OPORTUNIDADES ===================================
+// ============================================================
+
 model Opportunity {
   id              String            @id @default(cuid())
   companyId       String            @map("company_id")
@@ -253,7 +278,10 @@ model Opportunity {
   @@map("opportunities")
 }
 
-// ========== PROPOSTAS ==========
+// ============================================================
+// ========== PROPOSTAS =======================================
+// ============================================================
+
 model Proposal {
   id              String            @id @default(cuid())
   number          String            @unique
@@ -299,6 +327,7 @@ model Proposal {
   paymentLinks    PaymentLink[]
   activities      Activity[]
   tasks           Task[]
+  qrCodes         QRCode[]          @relation("ProposalQRCode")
 
   @@map("proposals")
 }
@@ -345,7 +374,10 @@ model ProposalApproval {
   @@map("proposal_approvals")
 }
 
-// ========== REPRESENTANTES ==========
+// ============================================================
+// ========== REPRESENTANTES E COMISSÕES ======================
+// ============================================================
+
 model Representative {
   id              String            @id @default(cuid())
   userId          String            @unique @map("user_id")
@@ -409,7 +441,10 @@ model Commission {
   @@map("commissions")
 }
 
-// ========== CONTRATOS ==========
+// ============================================================
+// ========== CONTRATOS =======================================
+// ============================================================
+
 model Contract {
   id              String            @id @default(cuid())
   proposalId      String?           @map("proposal_id")
@@ -428,12 +463,18 @@ model Contract {
 
   proposal        Proposal?         @relation(fields: [proposalId], references: [id], onDelete: SetNull)
   company         Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  responsible     User              @relation(fields: [responsibleId], references: [id])
+  responsible     User              @relation("ContractResponsible", fields: [responsibleId], references: [id])
+  tasks           Task[]
+  documents       Document[]
+  qrCodes         QRCode[]          @relation("ContractQRCode")
 
   @@map("contracts")
 }
 
-// ========== FINANCEIRO ==========
+// ============================================================
+// ========== FINANCEIRO ======================================
+// ============================================================
+
 model AccountReceivable {
   id              String            @id @default(cuid())
   companyId       String            @map("company_id")
@@ -526,7 +567,10 @@ model PaymentLink {
   @@map("payment_links")
 }
 
-// ========== PLANILHAS E PRODUTOS ==========
+// ============================================================
+// ========== PLANILHAS E PRODUTOS ============================
+// ============================================================
+
 model Platform {
   id              String            @id @default(cuid())
   name            String
@@ -562,7 +606,10 @@ model Revenue {
   @@map("revenues")
 }
 
-// ========== CENTROS DE CUSTO ==========
+// ============================================================
+// ========== CENTROS DE CUSTO ================================
+// ============================================================
+
 model CostCenter {
   id              String            @id @default(cuid())
   name            String            @unique
@@ -597,7 +644,10 @@ model Budget {
   @@map("budgets")
 }
 
-// ========== ADMINISTRATIVO ==========
+// ============================================================
+// ========== ADMINISTRATIVO ==================================
+// ============================================================
+
 model Employee {
   id              String            @id @default(cuid())
   userId          String            @unique @map("user_id")
@@ -637,7 +687,10 @@ model Supplier {
   @@map("suppliers")
 }
 
-// ========== DOCUMENTOS ==========
+// ============================================================
+// ========== DOCUMENTOS ======================================
+// ============================================================
+
 model Document {
   id              String            @id @default(cuid())
   title           String
@@ -653,15 +706,21 @@ model Document {
   createdAt       DateTime          @default(now()) @map("created_at")
   updatedAt       DateTime          @updatedAt @map("updated_at")
 
-  responsible     User              @relation(fields: [responsibleId], references: [id])
+  responsible     User              @relation("DocumentResponsible", fields: [responsibleId], references: [id])
   company         Company?          @relation(fields: [companyId], references: [id], onDelete: SetNull)
   proposal        Proposal?         @relation(fields: [proposalId], references: [id], onDelete: SetNull)
   contract        Contract?         @relation(fields: [contractId], references: [id], onDelete: SetNull)
+  
+  signatureRequests SignatureRequest[]
+  signatureFields   SignatureField[]
 
   @@map("documents")
 }
 
-// ========== TAREFAS ==========
+// ============================================================
+// ========== TAREFAS =========================================
+// ============================================================
+
 model Task {
   id              String            @id @default(cuid())
   title           String
@@ -688,7 +747,10 @@ model Task {
   @@map("tasks")
 }
 
-// ========== AUDITORIA ==========
+// ============================================================
+// ========== AUDITORIA =======================================
+// ============================================================
+
 model AuditLog {
   id              String            @id @default(cuid())
   userId          String            @map("user_id")
@@ -704,4 +766,175 @@ model AuditLog {
   user            User              @relation("UserAuditLogs", fields: [userId], references: [id])
 
   @@map("audit_logs")
+}
+
+// ============================================================
+// ========== MARKETING =======================================
+// ============================================================
+
+model MarketingCampaign {
+  id              String            @id @default(cuid())
+  name            String
+  description     String?
+  status          String            // Ativa, Pausada, Programada, Encerrada
+  startDate       DateTime?         @map("start_date")
+  endDate         DateTime?         @map("end_date")
+  budget          Decimal?          @db.Decimal(10, 2)
+  channel         String?           // Instagram, Facebook, LinkedIn, E-mail, WhatsApp
+  responsibleId   String?           @map("responsible_id")
+  notes           String?
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
+
+  responsible     User?             @relation(fields: [responsibleId], references: [id], onDelete: SetNull)
+  leads           Lead[]            @relation("CampaignLeads")
+  media           Media[]           @relation("CampaignMedia")
+
+  @@map("marketing_campaigns")
+}
+
+// ============================================================
+// ========== QR CODE =========================================
+// ============================================================
+
+model QRCode {
+  id            String    @id @default(cuid())
+  data          String    @unique
+  type          String    // payment, proposal, contract, document, lead, custom
+  relatedId     String?   @map("related_id")
+  url           String?   // URL completa para redirecionamento
+  usageCount    Int       @default(0) @map("usage_count")
+  lastUsedAt    DateTime? @map("last_used_at")
+  expiresAt     DateTime? @map("expires_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  // Relacionamentos opcionais
+  lead          Lead?     @relation("LeadQRCode", fields: [relatedId], references: [id])
+  proposal      Proposal? @relation("ProposalQRCode", fields: [relatedId], references: [id])
+  contract      Contract? @relation("ContractQRCode", fields: [relatedId], references: [id])
+  document      Document? @relation("DocumentQRCode", fields: [relatedId], references: [id])
+
+  @@map("qrcodes")
+}
+
+// ============================================================
+// ========== MÍDIA ===========================================
+// ============================================================
+
+model Media {
+  id            String    @id @default(cuid())
+  name          String
+  originalName  String    @map("original_name")
+  mimeType      String    @map("mime_type")
+  size          Int
+  url           String
+  thumbnailUrl  String?   @map("thumbnail_url")
+  type          String    // image, video, document, other
+  category      String
+  tags          String[]
+  description   String?
+  uploadedBy    String    @map("uploaded_by")
+  campaignId    String?   @map("campaign_id")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  uploadedByUser User     @relation("MediaUploader", fields: [uploadedBy], references: [id])
+  campaign      MarketingCampaign? @relation("CampaignMedia", fields: [campaignId], references: [id])
+
+  @@map("media")
+}
+
+// ============================================================
+// ========== ASSINATURA ======================================
+// ============================================================
+
+model SignatureRequest {
+  id              String    @id @default(cuid())
+  documentId      String    @map("document_id")
+  documentTitle   String    @map("document_title")
+  signerName      String    @map("signer_name")
+  signerEmail     String    @map("signer_email")
+  signerPhone     String?   @map("signer_phone")
+  status          String    // pending, viewed, signed, declined, expired, cancelled
+  signatureData   String?   @map("signature_data")  // Base64 da assinatura
+  signatureDate   DateTime? @map("signature_date")
+  token           String    @unique
+  ipAddress       String?   @map("ip_address")
+  userAgent       String?   @map("user_agent")
+  notes           String?
+  expiresAt       DateTime? @map("expires_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  document        Document  @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  fields          SignatureField[]
+
+  @@map("signature_requests")
+}
+
+model SignatureField {
+  id            String    @id @default(cuid())
+  documentId    String    @map("document_id")
+  name          String
+  type          String    // signature, initial, date, text, checkbox, radio
+  x             Int
+  y             Int
+  width         Int
+  height        Int
+  page          Int
+  required      Boolean   @default(true)
+  value         String?
+  signerId      String    @map("signer_id")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  document      Document  @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  signer        SignatureRequest @relation(fields: [signerId], references: [id], onDelete: Cascade)
+
+  @@map("signature_fields")
+}
+
+// ============================================================
+// ========== NOTIFICAÇÕES ====================================
+// ============================================================
+
+model Notification {
+  id              String    @id @default(cuid())
+  userId          String    @map("user_id")
+  type            String    // info, warning, success, error
+  title           String
+  message         String
+  link            String?
+  read            Boolean   @default(false)
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+}
+
+// ============================================================
+// ========== CALENDÁRIO ======================================
+// ============================================================
+
+model CalendarEvent {
+  id              String    @id @default(cuid())
+  userId          String    @map("user_id")
+  title           String
+  description     String?
+  startDate       DateTime  @map("start_date")
+  endDate         DateTime? @map("end_date")
+  type            String    // task, followup, meeting, deadline, contract
+  status          String    // pending, completed, cancelled
+  priority        String    // low, medium, high
+  link            String?
+  relatedId       String?   @map("related_id")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("calendar_events")
 }
