@@ -4,6 +4,14 @@ import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "@/lib/db/prisma";
 import { compare } from "bcryptjs";
 
+// Diagnóstico inicial: verifica se as variáveis essenciais existem no Vercel
+if (!process.env.NEXTAUTH_SECRET) {
+  console.error("❌ ERRO CRÍTICO: A variável NEXTAUTH_SECRET não foi encontrada ou está vazia no Vercel.");
+}
+if (!process.env.DATABASE_URL) {
+  console.error("❌ ERRO CRÍTICO: A variável DATABASE_URL não foi encontrada ou está vazia no Vercel.");
+}
+
 declare module "next-auth" {
   interface User {
     role?: string;
@@ -21,7 +29,6 @@ declare module "next-auth" {
 }
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
-  // Garante que a secret seja lida corretamente no Vercel
   secret: process.env.NEXTAUTH_SECRET,
   adapter: PrismaAdapter(prisma),
   session: {
@@ -30,8 +37,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   },
   pages: {
     signIn: "/login",
-    // CRUCIAL: Redireciona erros de volta para o login em vez de /api/auth/error (que causa o bug do JSON)
-    error: "/login", 
+    error: "/login", // Redireciona erros para o login em vez de quebrar a API
   },
   providers: [
     CredentialsProvider({
@@ -79,7 +85,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             return null;
           }
 
-          // Atualiza o último login
           await prisma.user.update({
             where: { id: user.id },
             data: {
@@ -99,7 +104,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             permissions: permissions.map((p) => `${p.module}:${p.action}`),
           };
         } catch (error) {
-          console.error("Erro interno na autenticação:", error);
+          console.error("❌ Erro ao conectar no banco de dados ou autenticar:", error);
           return null;
         }
       },
