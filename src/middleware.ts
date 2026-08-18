@@ -5,8 +5,15 @@ import { getToken } from 'next-auth/jwt';
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
 
-  // Rotas públicas
-  const publicPaths = ['/login', '/api/auth', '/_next', '/favicon.ico', '/assinatura'];
+  // Rotas públicas (incluindo a nova rota de diagnóstico)
+  const publicPaths = [
+    '/login', 
+    '/api/auth', 
+    '/api/debug',  // 🔥 Adicione esta linha
+    '/_next', 
+    '/favicon.ico', 
+    '/assinatura'
+  ];
 
   const isPublicPath = publicPaths.some(
     (path) => pathname === path || pathname.startsWith(path)
@@ -16,7 +23,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Verificar autenticação com getToken (mais leve que auth())
+  // Verificar autenticação
   const token = await getToken({ req: request });
 
   if (!token) {
@@ -30,6 +37,6 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/((?!api/auth|_next/static|_next/image|favicon.ico|logo.svg|media).*)',
+    '/((?!api/auth|api/debug|_next/static|_next/image|favicon.ico|logo.svg|media).*)',
   ],
 };
