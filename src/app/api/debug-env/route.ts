@@ -1,8 +1,11 @@
 import { NextResponse } from 'next/server';
 
+// 🔓 Rota pública - NÃO requer autenticação
+export const dynamic = 'force-dynamic';
+
 export async function GET() {
   // ⚠️ NUNCA exponha variáveis sensíveis em produção!
-  // Este é apenas para diagnóstico temporário - será removido depois
+  // Este é apenas para diagnóstico temporário
 
   const envStatus = {
     NEXTAUTH_URL: process.env.NEXTAUTH_URL ? '✅ Configurado' : '❌ FALTANDO',
@@ -19,6 +22,6 @@ export async function GET() {
     status: 'ok',
     env: envStatus,
     timestamp: new Date().toISOString(),
-    message: 'Variáveis marcadas como "Configurado" estão presentes',
+    message: 'Variáveis marcadas como "✅ Configurado" estão presentes',
   });
 }
