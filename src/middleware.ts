@@ -1,45 +1,38 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { getToken } from 'next-auth/jwt';
 
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
 
-  // 🔥 LOG PARA DEPURAÇÃO
-  console.log('[middleware] Path:', pathname);
-
-  // Rotas públicas
-  const publicPaths = ['/login', '/api/auth', '/_next', '/favicon.ico', '/assinatura'];
-
-  const isPublicPath = publicPaths.some(
-    (path) => pathname === path || pathname.startsWith(path)
-  );
-
-  if (isPublicPath) {
-    console.log('[middleware] Rota pública, liberando');
+  // 1. NUNCA interceptar rotas do NextAuth ou arquivos estáticos
+  if (
+    pathname.startsWith('/api/auth') || 
+    pathname.startsWith('/_next') || 
+    pathname === '/favicon.ico' ||
+    pathname.match(/\.(png|svg|jpg|jpeg|gif|webp|ico)$/)
+  ) {
     return NextResponse.next();
   }
 
-  try {
-    const token = await getToken({ req: request });
-    console.log('[middleware] Token existe?', !!token);
-
-    if (!token) {
-      const loginUrl = new URL('/login', request.url);
-      loginUrl.searchParams.set('callbackUrl', pathname);
-      return NextResponse.redirect(loginUrl);
-    }
-
+  // 2. Rotas públicas
+  if (pathname === '/login' || pathname.startsWith('/assinatura')) {
     return NextResponse.next();
-  } catch (error) {
-    console.error('[middleware] Erro:', error);
+  }
+
+  // 3. Verificar cookie de sessão diretamente (100% confiável e leve)
+  const sessionCookie = 
+    request.cookies.get('authjs.session-token')?.value || 
+    request.cookies.get('__Secure-authjs.session-token')?.value;
+
+  if (!sessionCookie) {
     const loginUrl = new URL('/login', request.url);
+    loginUrl.searchParams.set('callbackUrl', pathname);
     return NextResponse.redirect(loginUrl);
   }
+
+  return NextResponse.next();
 }
 
 export const config = {
-  matcher: [
-    '/((?!api/auth|_next/static|_next/image|favicon.ico|logo.svg|media).*)',
-  ],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)'],
 };
