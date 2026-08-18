@@ -1,6 +1,5 @@
 import NextAuth from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
-import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "@/lib/db/prisma";
 import { compare } from "bcryptjs";
 
@@ -24,8 +23,12 @@ declare module "next-auth" {
 }
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  // Usa a variável do Vercel ou a chave de emergência
   secret: process.env.NEXTAUTH_SECRET || FALLBACK_SECRET,
-  adapter: PrismaAdapter(prisma),
+  
+  // REMOVIDO: adapter: PrismaAdapter(prisma) 
+  // (Não é necessário pois usamos authorize customizado, e ele pode causar travamento 500)
+  
   session: {
     strategy: "jwt",
     maxAge: 8 * 60 * 60,
@@ -47,7 +50,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         }
 
         try {
-          // 1. Busca o usuário de forma simples primeiro (evita erros de relacionamento no Prisma)
+          // 1. Busca o usuário de forma direta
           const user = await prisma.user.findUnique({
             where: { email: credentials.email as string },
           });
@@ -61,13 +64,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             return null;
           }
 
-          // 2. Atualiza o último login em segundo plano (se falhar, não interrompe o login)
+          // 2. Atualiza o último login em segundo plano (sem travar o login se falhar)
           prisma.user.update({
             where: { id: user.id },
             data: { lastLoginAt: new Date() },
           }).catch((err) => console.error("Erro ao atualizar lastLoginAt:", err));
 
-          // 3. Busca as permissões em uma consulta separada e mais segura
+          // 3. Busca as permissões de forma isolada
           const userRoles = await prisma.userRole.findMany({
             where: { userId: user.id },
             include: {
@@ -95,9 +98,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             permissions: permissions.map((p: any) => `${p.module}:${p.action}`),
           };
         } catch (error) {
-          // Isso é CRUCIAL: captura o erro, imprime no log do Vercel, mas retorna null em vez de quebrar o servidor com HTML
           console.error("💥 ERRO FATAL NO AUTH (Prisma ou Senha):", error);
-          return null;
+          return null; // Retorna null em vez de deixar o servidor quebrar
         }
       },
     }),
