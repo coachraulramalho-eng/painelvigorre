@@ -4,14 +4,17 @@ import { useSession } from 'next-auth/react';
 
 export function usePermissions() {
   const { data: session } = useSession();
+  
+  // Correção de Tipo Segura para o TypeScript do Vercel
+  const user = session?.user as { role?: string; permissions?: string[] } | undefined;
 
   const hasPermission = (module: string, action: string): boolean => {
-    if (!session?.user) return false;
+    if (!user) return false;
 
     // ADM Master tem todas as permissões
-    if (session.user.role === 'ADM Master') return true;
+    if (user.role === 'ADM Master') return true;
 
-    const permissions = session.user.permissions || [];
+    const permissions = user.permissions || [];
     return permissions.includes(`${module}:${action}`);
   };
 
@@ -46,7 +49,7 @@ export function usePermissions() {
     hasAnyPermission,
     hasAllPermissions,
     getModuleAccess,
-    isMaster: session?.user?.role === 'ADM Master',
-    userRole: session?.user?.role || null,
+    isMaster: user?.role === 'ADM Master',
+    userRole: user?.role || null,
   };
 }
