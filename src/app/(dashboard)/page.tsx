@@ -50,6 +50,9 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Correção de Tipo Segura para o TypeScript do Vercel
+  const user = session?.user as { role?: string; name?: string } | undefined;
+
   useEffect(() => {
     loadMetrics();
   }, []);
@@ -104,7 +107,7 @@ export default function DashboardPage() {
     return null;
   }
 
-  const isMaster = session?.user?.role === 'ADM Master';
+  const isMaster = user?.role === 'ADM Master';
 
   return (
     <div className="space-y-6">
@@ -116,12 +119,12 @@ export default function DashboardPage() {
           <p className="text-muted-foreground">
             {isMaster 
               ? 'Visão completa da empresa' 
-              : `Bem-vindo, ${session?.user?.name || 'Usuário'}`
+              : `Bem-vindo, ${user?.name || 'Usuário'}`
             }
           </p>
         </div>
         <Badge variant="outline" className="px-4 py-2">
-          {session?.user?.role || 'Funcionário'}
+          {user?.role || 'Funcionário'}
         </Badge>
       </div>
 
