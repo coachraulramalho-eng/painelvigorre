@@ -4,16 +4,8 @@ import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "@/lib/db/prisma";
 import { compare } from "bcryptjs";
 
-// =================================================================
-// DIAGNÓSTICO: O Vercel vai imprimir isso nos logs se algo estiver errado
-// =================================================================
-if (!process.env.NEXTAUTH_SECRET) {
-  console.error("🚨🚨🚨 ERRO CRÍTICO: NEXTAUTH_SECRET NÃO FOI ENCONTRADA NO VERCEL! 🚨🚨🚨");
-}
-if (!process.env.DATABASE_URL) {
-  console.error("🚨🚨🚨 ERRO CRÍTICO: DATABASE_URL NÃO FOI ENCONTRADA NO VERCEL! 🚨🚨🚨");
-}
-// =================================================================
+// CHAVE DE EMERGÊNCIA: Contorna o bug do painel do Vercel que não salva a variável
+const FALLBACK_SECRET = "vigorre2026SecretKeyAuth9x8w7v6u5t4s3r2q1p0";
 
 declare module "next-auth" {
   interface User {
@@ -32,7 +24,8 @@ declare module "next-auth" {
 }
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
-  secret: process.env.NEXTAUTH_SECRET,
+  // Usa a variável do Vercel se existir, senão usa a chave de emergência
+  secret: process.env.NEXTAUTH_SECRET || FALLBACK_SECRET,
   adapter: PrismaAdapter(prisma),
   session: {
     strategy: "jwt",
@@ -40,7 +33,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   },
   pages: {
     signIn: "/login",
-    error: "/login", 
+    error: "/login",
   },
   providers: [
     CredentialsProvider({
@@ -97,7 +90,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             permissions: permissions.map((p) => `${p.module}:${p.action}`),
           };
         } catch (error) {
-          console.error("🚨 ERRO AO CONECTAR NO BANCO DE DADOS:", error);
+          console.error("❌ Erro ao conectar no banco de dados:", error);
           return null;
         }
       },
