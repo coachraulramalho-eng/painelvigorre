@@ -1,5 +1,32 @@
-import NextAuth from "next-auth";
+import NextAuth, { type DefaultSession } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
+
+// 1. Extensão de tipos para o NextAuth reconhecer 'role' e 'permissions'
+declare module "next-auth" {
+  interface User {
+    id: string;
+    name?: string | null;
+    email?: string | null;
+    image?: string | null;
+    role?: string;
+    permissions?: string[];
+  }
+  interface Session {
+    user: {
+      id: string;
+      role?: string;
+      permissions?: string[];
+    } & DefaultSession["user"];
+  }
+}
+
+declare module "next-auth/jwt" {
+  interface JWT {
+    id?: string;
+    role?: string;
+    permissions?: string[];
+  }
+}
 
 // Chave fixa e direta no código
 const SECRET = "vigorre2026SecretKeyAuth9x8w7v6u5t4s3r2q1p0";
@@ -23,7 +50,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         password: { label: "Senha", type: "password" },
       },
       async authorize(credentials) {
-        // Correção de Tipo: Força o TypeScript a tratar como string segura
         const email = (credentials?.email as string)?.toLowerCase() || "";
         const password = credentials?.password as string;
 
@@ -49,8 +75,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id;
-        token.role = user.role;
-        token.permissions = user.permissions;
+        // Asserção segura para contornar a rigidez do TS no NextAuth v5 (User | AdapterUser)
+        token.role = (user as any).role;
+        token.permissions = (user as any).permissions;
       }
       return token;
     },
