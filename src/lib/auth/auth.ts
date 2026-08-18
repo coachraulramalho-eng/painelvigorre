@@ -3,8 +3,16 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import { prisma } from "@/lib/db/prisma";
 import { compare } from "bcryptjs";
 
-// Chave de emergência caso o Vercel insista em não ler a variável
+// Chave de emergência blindada
 const FALLBACK_SECRET = "vigorre2026SecretKeyAuth9x8w7v6u5t4s3r2q1p0";
+const finalSecret = process.env.NEXTAUTH_SECRET || FALLBACK_SECRET;
+
+// LOG GIGANTE PARA PROVAR QUE O CÓDIGO FOI ATUALIZADO NO VERCEL
+console.log("========================================");
+console.log("🚀 AUTH.TS CARREGADO NO SERVIDOR!");
+console.log("🚀 NEXTAUTH_SECRET DO VERCEL:", process.env.NEXTAUTH_SECRET ? "✅ PRESENTE" : "❌ AUSENTE (USANDO FALLBACK)");
+console.log("🚀 TAMANHO DA CHAVE FINAL:", finalSecret.length, "caracteres");
+console.log("========================================");
 
 declare module "next-auth" {
   interface User {
@@ -23,12 +31,7 @@ declare module "next-auth" {
 }
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
-  // Usa a variável do Vercel ou a chave de emergência
-  secret: process.env.NEXTAUTH_SECRET || FALLBACK_SECRET,
-  
-  // REMOVIDO: adapter: PrismaAdapter(prisma) 
-  // (Não é necessário pois usamos authorize customizado, e ele pode causar travamento 500)
-  
+  secret: finalSecret,
   session: {
     strategy: "jwt",
     maxAge: 8 * 60 * 60,
@@ -50,7 +53,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         }
 
         try {
-          // 1. Busca o usuário de forma direta
           const user = await prisma.user.findUnique({
             where: { email: credentials.email as string },
           });
@@ -64,22 +66,19 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             return null;
           }
 
-          // 2. Atualiza o último login em segundo plano (sem travar o login se falhar)
+          // Atualiza login em segundo plano (não trava se falhar)
           prisma.user.update({
             where: { id: user.id },
             data: { lastLoginAt: new Date() },
-          }).catch((err) => console.error("Erro ao atualizar lastLoginAt:", err));
+          }).catch((err) => console.error("Erro lastLoginAt:", err));
 
-          // 3. Busca as permissões de forma isolada
           const userRoles = await prisma.userRole.findMany({
             where: { userId: user.id },
             include: {
               role: {
                 include: {
                   permissions: {
-                    include: {
-                      permission: true,
-                    },
+                    include: { permission: true },
                   },
                 },
               },
@@ -98,8 +97,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             permissions: permissions.map((p: any) => `${p.module}:${p.action}`),
           };
         } catch (error) {
-          console.error("💥 ERRO FATAL NO AUTH (Prisma ou Senha):", error);
-          return null; // Retorna null em vez de deixar o servidor quebrar
+          console.error("💥 ERRO FATAL NO AUTH:", error);
+          return null;
         }
       },
     }),
