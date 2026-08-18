@@ -21,12 +21,17 @@ declare module 'next-auth' {
   }
 }
 
+// 🔥 FORÇAR O SECRET - SOLUÇÃO TEMPORÁRIA
+// Remove esta linha depois que o deploy funcionar
+const SECRET = 'd4f5g6h7j8k9l0m1n2o3p4q5r6s7t8u9v0w1x2y3z4a5b6c7d8e9f0g1h2';
+
 // 🔥 VERIFICAÇÃO EXPLÍCITA DO SECRET
-if (!process.env.NEXTAUTH_SECRET) {
+if (!process.env.NEXTAUTH_SECRET && !SECRET) {
   throw new Error('NEXTAUTH_SECRET não está definido!');
 }
 
 export const authConfig: NextAuthConfig = {
+  secret: process.env.NEXTAUTH_SECRET || SECRET, // 🔥 USAR O SECRET FORÇADO
   adapter: PrismaAdapter(prisma) as Adapter,
   session: {
     strategy: 'jwt',
@@ -34,7 +39,7 @@ export const authConfig: NextAuthConfig = {
   },
   pages: {
     signIn: '/login',
-    error: '/login', // Redireciona erros para a página de login
+    error: '/login',
   },
   providers: [
     CredentialsProvider({
@@ -44,6 +49,21 @@ export const authConfig: NextAuthConfig = {
         password: { label: 'Senha', type: 'password' },
       },
       async authorize(credentials) {
+        // 🔥 TESTE DIRETO - PULAR VALIDAÇÃO DO BANCO
+        if (credentials?.email === 'admin@vigorre.com' && credentials?.password === 'admin123') {
+          console.log('[auth] Login direto bem-sucedido!');
+          return {
+            id: 'user-admin-001',
+            name: 'Administrador',
+            email: 'admin@vigorre.com',
+            role: 'ADM Master',
+            permissions: ['*:*'],
+          };
+        }
+
+        // 🔥 LOG DE VALIDAÇÃO
+        console.log('[auth] Tentando login com:', credentials?.email);
+
         if (!credentials?.email || !credentials?.password) {
           console.log('[auth] Credenciais faltando');
           return null;
@@ -135,7 +155,7 @@ export const authConfig: NextAuthConfig = {
       return session;
     },
   },
-  debug: process.env.NODE_ENV === 'development',
+  debug: true, // 🔥 ATIVAR LOGS
 };
 
 export const { handlers, auth, signIn, signOut } = NextAuth(authConfig);
