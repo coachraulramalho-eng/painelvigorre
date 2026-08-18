@@ -9,6 +9,10 @@ import { Search, Bell, User, LogOut } from 'lucide-react';
 
 export function Header() {
   const { data: session } = useSession();
+  
+  // Correção de Tipo Segura para o TypeScript do Vercel
+  const user = session?.user as { name?: string; role?: string } | undefined;
+
   const [showNotifications, setShowNotifications] = useState(false);
 
   const notifications = [
@@ -44,12 +48,12 @@ export function Header() {
           <div className="flex items-center gap-3 border-l pl-4">
             <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center">
               <span className="text-white text-sm font-semibold">
-                {session?.user?.name?.charAt(0) || 'U'}
+                {user?.name?.charAt(0) || 'U'}
               </span>
             </div>
             <div className="hidden md:block">
-              <p className="text-sm font-medium">{session?.user?.name || 'Usuário'}</p>
-              <p className="text-xs text-muted-foreground">{session?.user?.role || 'ADM Master'}</p>
+              <p className="text-sm font-medium">{user?.name || 'Usuário'}</p>
+              <p className="text-xs text-muted-foreground">{user?.role || 'ADM Master'}</p>
             </div>
           </div>
         </div>
