@@ -4,7 +4,7 @@ import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "@/lib/db/prisma";
 import { compare } from "bcryptjs";
 
-// CHAVE DE EMERGÊNCIA: Contorna o bug do painel do Vercel que não salva a variável
+// Chave de emergência caso o Vercel insista em não ler a variável
 const FALLBACK_SECRET = "vigorre2026SecretKeyAuth9x8w7v6u5t4s3r2q1p0";
 
 declare module "next-auth" {
@@ -24,7 +24,6 @@ declare module "next-auth" {
 }
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
-  // Usa a variável do Vercel se existir, senão usa a chave de emergência
   secret: process.env.NEXTAUTH_SECRET || FALLBACK_SECRET,
   adapter: PrismaAdapter(prisma),
   session: {
@@ -48,18 +47,35 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         }
 
         try {
+          // 1. Busca o usuário de forma simples primeiro (evita erros de relacionamento no Prisma)
           const user = await prisma.user.findUnique({
             where: { email: credentials.email as string },
+          });
+
+          if (!user || !user.password || !user.active) {
+            return null;
+          }
+
+          const isValid = await compare(credentials.password as string, user.password);
+          if (!isValid) {
+            return null;
+          }
+
+          // 2. Atualiza o último login em segundo plano (se falhar, não interrompe o login)
+          prisma.user.update({
+            where: { id: user.id },
+            data: { lastLoginAt: new Date() },
+          }).catch((err) => console.error("Erro ao atualizar lastLoginAt:", err));
+
+          // 3. Busca as permissões em uma consulta separada e mais segura
+          const userRoles = await prisma.userRole.findMany({
+            where: { userId: user.id },
             include: {
-              roles: {
+              role: {
                 include: {
-                  role: {
+                  permissions: {
                     include: {
-                      permissions: {
-                        include: {
-                          permission: true,
-                        },
-                      },
+                      permission: true,
                     },
                   },
                 },
@@ -67,30 +83,20 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             },
           });
 
-          if (!user || !user.password) return null;
-
-          const isValid = await compare(credentials.password as string, user.password);
-          if (!isValid) return null;
-          if (!user.active) return null;
-
-          await prisma.user.update({
-            where: { id: user.id },
-            data: { lastLoginAt: new Date() },
-          });
-
-          const permissions = user.roles.flatMap((userRole) =>
-            userRole.role.permissions.map((rp) => rp.permission)
+          const permissions = userRoles.flatMap((userRole: any) =>
+            userRole.role.permissions.map((rp: any) => rp.permission)
           );
 
           return {
             id: user.id,
             name: user.name,
             email: user.email,
-            role: user.roles[0]?.role.name || "Funcionário",
-            permissions: permissions.map((p) => `${p.module}:${p.action}`),
+            role: userRoles[0]?.role.name || "Funcionário",
+            permissions: permissions.map((p: any) => `${p.module}:${p.action}`),
           };
         } catch (error) {
-          console.error("❌ Erro ao conectar no banco de dados:", error);
+          // Isso é CRUCIAL: captura o erro, imprime no log do Vercel, mas retorna null em vez de quebrar o servidor com HTML
+          console.error("💥 ERRO FATAL NO AUTH (Prisma ou Senha):", error);
           return null;
         }
       },
