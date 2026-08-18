@@ -1,41 +1,41 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { auth } from '@/lib/auth/auth';
 
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
 
-  // 1. NUNCA bloquear rotas de autenticação ou arquivos do sistema
-  if (
-    pathname.startsWith('/api/auth') || 
-    pathname.startsWith('/_next') || 
-    pathname === '/favicon.ico' ||
-    pathname.endsWith('.png') ||
-    pathname.endsWith('.svg') ||
-    pathname.endsWith('.jpg') ||
-    pathname.endsWith('.jpeg')
-  ) {
+  // Rotas públicas
+  const publicPaths = ['/login', '/api/auth', '/_next', '/favicon.ico', '/assinatura'];
+
+  const isPublicPath = publicPaths.some(
+    (path) => pathname === path || pathname.startsWith(path)
+  );
+
+  if (isPublicPath) {
     return NextResponse.next();
   }
 
-  // 2. Rotas públicas
-  if (pathname === '/login' || pathname.startsWith('/assinatura') || pathname === '/api/debug-env') {
+  try {
+    const session = await auth();
+    console.log('[middleware] Session:', session?.user?.email || 'none');
+
+    if (!session) {
+      const loginUrl = new URL('/login', request.url);
+      loginUrl.searchParams.set('callbackUrl', pathname);
+      return NextResponse.redirect(loginUrl);
+    }
+
     return NextResponse.next();
-  }
-
-  // 3. Verificar cookie de sessão do NextAuth v5
-  const sessionCookie = 
-    request.cookies.get('authjs.session-token')?.value || 
-    request.cookies.get('__Secure-authjs.session-token')?.value;
-
-  if (!sessionCookie) {
+  } catch (error) {
+    console.error('[middleware] Erro:', error);
     const loginUrl = new URL('/login', request.url);
-    loginUrl.searchParams.set('callbackUrl', pathname);
     return NextResponse.redirect(loginUrl);
   }
-
-  return NextResponse.next();
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)'],
+  matcher: [
+    '/((?!api/auth|_next/static|_next/image|favicon.ico|logo.svg|media).*)',
+  ],
 };
