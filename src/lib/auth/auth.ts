@@ -1,13 +1,12 @@
 import NextAuth, { type DefaultSession } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 
-// 1. Extensão de tipos para o NextAuth reconhecer 'role' e 'permissions'
+// 1. Extensão de tipos para o TypeScript não reclamar
 declare module "next-auth" {
   interface User {
     id: string;
     name?: string | null;
     email?: string | null;
-    image?: string | null;
     role?: string;
     permissions?: string[];
   }
@@ -28,19 +27,24 @@ declare module "next-auth/jwt" {
   }
 }
 
-// Chave fixa e direta no código
-const SECRET = "vigorre2026SecretKeyAuth9x8w7v6u5t4s3r2q1p0";
+// 2. RADAR: Prova que o arquivo está rodando no servidor
+console.log("========================================");
+console.log("🚀 AUTH.TS CARREGADO NO SERVIDOR VERCEL");
+console.log("========================================");
+
+// 3. CHAVE HARDCODED: Ignora 100% qualquer problema de variável de ambiente do Vercel
+const HARDCODED_SECRET = "vigorre2026SecretKeyAuth9x8w7v6u5t4s3r2q1p0";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
-  secret: SECRET,
-  trustHost: true, // Permite que o Vercel use URLs de preview e produção
+  secret: HARDCODED_SECRET,
+  trustHost: true, // Permite URLs de preview e produção do Vercel
   session: {
     strategy: "jwt",
     maxAge: 8 * 60 * 60,
   },
   pages: {
     signIn: "/login",
-    error: "/login",
+    error: "/login", // Força erros a irem para o login, não para /api/auth/error
   },
   providers: [
     CredentialsProvider({
@@ -50,32 +54,42 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         password: { label: "Senha", type: "password" },
       },
       async authorize(credentials) {
-        const email = (credentials?.email as string)?.toLowerCase() || "";
-        const password = credentials?.password as string;
+        console.log("🚀 [AUTHORIZE] Função de login chamada!");
+        console.log("🚀 [AUTHORIZE] Dados recebidos:", credentials);
 
-        console.log("🚀 [AUTH] Tentativa de login:", email);
-        
-        if (email === "admin@vigorre.com" && password === "admin123") {
-          console.log("✅ [AUTH] Login bem-sucedido! Criando sessão...");
-          return {
-            id: "mock-admin-123",
-            name: "Administrador",
-            email: "admin@vigorre.com",
-            role: "ADM Master",
-            permissions: ["admin:all"],
-          };
+        try {
+          // Limpeza segura dos dados para evitar erros de tipo
+          const email = String(credentials?.email || "").toLowerCase().trim();
+          const password = String(credentials?.password || "").trim();
+
+          console.log("🚀 [AUTHORIZE] Email processado:", email);
+
+          // MOCK: Aceita apenas este usuário para provar que o sistema funciona
+          if (email === "admin@vigorre.com" && password === "admin123") {
+            console.log("✅ [AUTHORIZE] Login MOCK bem-sucedido! Gerando sessão...");
+            return {
+              id: "mock-admin-123",
+              name: "Administrador",
+              email: "admin@vigorre.com",
+              role: "ADM Master",
+              permissions: ["admin:all"],
+            };
+          }
+
+          console.log("❌ [AUTHORIZE] Credenciais incorretas.");
+          return null;
+        } catch (error) {
+          console.error("💥 [AUTHORIZE] ERRO FATAL CAPTURADO:", error);
+          return null;
         }
-        
-        console.log("❌ [AUTH] Login falhou (credenciais incorretas).");
-        return null;
       },
     }),
   ],
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
+        console.log("🚀 [JWT] Usuário autenticado, injetando dados no token...");
         token.id = user.id;
-        // Asserção segura para contornar a rigidez do TS no NextAuth v5 (User | AdapterUser)
         token.role = (user as any).role;
         token.permissions = (user as any).permissions;
       }
