@@ -6,7 +6,7 @@ const SECRET = "vigorre2026SecretKeyAuth9x8w7v6u5t4s3r2q1p0";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   secret: SECRET,
-  trustHost: true, // <--- ISSO RESOLVE O BLOQUEIO DA URL DE PREVIEW DO VERCEL
+  trustHost: true, // Permite que o Vercel use URLs de preview e produção
   session: {
     strategy: "jwt",
     maxAge: 8 * 60 * 60,
@@ -23,9 +23,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         password: { label: "Senha", type: "password" },
       },
       async authorize(credentials) {
-        console.log("🚀 [AUTH] Tentativa de login:", credentials?.email);
+        // Correção de Tipo: Força o TypeScript a tratar como string segura
+        const email = (credentials?.email as string)?.toLowerCase() || "";
+        const password = credentials?.password as string;
+
+        console.log("🚀 [AUTH] Tentativa de login:", email);
         
-        if (credentials?.email?.toLowerCase() === "admin@vigorre.com" && credentials?.password === "admin123") {
+        if (email === "admin@vigorre.com" && password === "admin123") {
           console.log("✅ [AUTH] Login bem-sucedido! Criando sessão...");
           return {
             id: "mock-admin-123",
