@@ -4,13 +4,16 @@ import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "@/lib/db/prisma";
 import { compare } from "bcryptjs";
 
-// Diagnóstico inicial: verifica se as variáveis essenciais existem no Vercel
+// =================================================================
+// DIAGNÓSTICO: O Vercel vai imprimir isso nos logs se algo estiver errado
+// =================================================================
 if (!process.env.NEXTAUTH_SECRET) {
-  console.error("❌ ERRO CRÍTICO: A variável NEXTAUTH_SECRET não foi encontrada ou está vazia no Vercel.");
+  console.error("🚨🚨🚨 ERRO CRÍTICO: NEXTAUTH_SECRET NÃO FOI ENCONTRADA NO VERCEL! 🚨🚨🚨");
 }
 if (!process.env.DATABASE_URL) {
-  console.error("❌ ERRO CRÍTICO: A variável DATABASE_URL não foi encontrada ou está vazia no Vercel.");
+  console.error("🚨🚨🚨 ERRO CRÍTICO: DATABASE_URL NÃO FOI ENCONTRADA NO VERCEL! 🚨🚨🚨");
 }
+// =================================================================
 
 declare module "next-auth" {
   interface User {
@@ -33,11 +36,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: PrismaAdapter(prisma),
   session: {
     strategy: "jwt",
-    maxAge: 8 * 60 * 60, // 8 horas
+    maxAge: 8 * 60 * 60,
   },
   pages: {
     signIn: "/login",
-    error: "/login", // Redireciona erros para o login em vez de quebrar a API
+    error: "/login", 
   },
   providers: [
     CredentialsProvider({
@@ -71,25 +74,15 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             },
           });
 
-          if (!user || !user.password) {
-            return null;
-          }
+          if (!user || !user.password) return null;
 
           const isValid = await compare(credentials.password as string, user.password);
-
-          if (!isValid) {
-            return null;
-          }
-
-          if (!user.active) {
-            return null;
-          }
+          if (!isValid) return null;
+          if (!user.active) return null;
 
           await prisma.user.update({
             where: { id: user.id },
-            data: {
-              lastLoginAt: new Date(),
-            },
+            data: { lastLoginAt: new Date() },
           });
 
           const permissions = user.roles.flatMap((userRole) =>
@@ -104,7 +97,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             permissions: permissions.map((p) => `${p.module}:${p.action}`),
           };
         } catch (error) {
-          console.error("❌ Erro ao conectar no banco de dados ou autenticar:", error);
+          console.error("🚨 ERRO AO CONECTAR NO BANCO DE DADOS:", error);
           return null;
         }
       },
