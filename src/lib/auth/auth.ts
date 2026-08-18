@@ -1,85 +1,117 @@
-import NextAuth, { type DefaultSession } from "next-auth";
-import CredentialsProvider from "next-auth/providers/credentials";
+import NextAuth, { type NextAuthConfig } from 'next-auth';
+import CredentialsProvider from 'next-auth/providers/credentials';
+import { PrismaAdapter } from '@auth/prisma-adapter';
+import { prisma } from '@/lib/db/prisma';
+import { compare } from 'bcryptjs';
+import { Adapter } from 'next-auth/adapters';
 
-// 1. Extensão de tipos para o TypeScript não reclamar
-declare module "next-auth" {
+declare module 'next-auth' {
   interface User {
-    id: string;
-    name?: string | null;
-    email?: string | null;
     role?: string;
     permissions?: string[];
   }
   interface Session {
     user: {
       id: string;
+      name: string;
+      email: string;
       role?: string;
       permissions?: string[];
-    } & DefaultSession["user"];
+    };
   }
 }
 
-declare module "next-auth/jwt" {
-  interface JWT {
-    id?: string;
-    role?: string;
-    permissions?: string[];
-  }
+// 🔥 VERIFICAÇÃO EXPLÍCITA DO SECRET
+if (!process.env.NEXTAUTH_SECRET) {
+  throw new Error('NEXTAUTH_SECRET não está definido!');
 }
 
-// 2. RADAR: Prova que o arquivo está rodando no servidor
-console.log("========================================");
-console.log("🚀 AUTH.TS CARREGADO NO SERVIDOR VERCEL");
-console.log("========================================");
-
-// 3. CHAVE HARDCODED: Ignora 100% qualquer problema de variável de ambiente do Vercel
-const HARDCODED_SECRET = "vigorre2026SecretKeyAuth9x8w7v6u5t4s3r2q1p0";
-
-export const { handlers, auth, signIn, signOut } = NextAuth({
-  secret: HARDCODED_SECRET,
-  trustHost: true, // Permite URLs de preview e produção do Vercel
+export const authConfig: NextAuthConfig = {
+  adapter: PrismaAdapter(prisma) as Adapter,
   session: {
-    strategy: "jwt",
+    strategy: 'jwt',
     maxAge: 8 * 60 * 60,
   },
   pages: {
-    signIn: "/login",
-    error: "/login", // Força erros a irem para o login, não para /api/auth/error
+    signIn: '/login',
+    error: '/login', // Redireciona erros para a página de login
   },
   providers: [
     CredentialsProvider({
-      name: "credentials",
+      name: 'credentials',
       credentials: {
-        email: { label: "E-mail", type: "email" },
-        password: { label: "Senha", type: "password" },
+        email: { label: 'E-mail', type: 'email' },
+        password: { label: 'Senha', type: 'password' },
       },
       async authorize(credentials) {
-        console.log("🚀 [AUTHORIZE] Função de login chamada!");
-        console.log("🚀 [AUTHORIZE] Dados recebidos:", credentials);
+        if (!credentials?.email || !credentials?.password) {
+          console.log('[auth] Credenciais faltando');
+          return null;
+        }
 
         try {
-          // Limpeza segura dos dados para evitar erros de tipo
-          const email = String(credentials?.email || "").toLowerCase().trim();
-          const password = String(credentials?.password || "").trim();
+          console.log('[auth] Buscando usuário:', credentials.email);
+          
+          const user = await prisma.user.findUnique({
+            where: { email: credentials.email as string },
+            include: {
+              roles: {
+                include: {
+                  role: {
+                    include: {
+                      permissions: {
+                        include: {
+                          permission: true,
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          });
 
-          console.log("🚀 [AUTHORIZE] Email processado:", email);
-
-          // MOCK: Aceita apenas este usuário para provar que o sistema funciona
-          if (email === "admin@vigorre.com" && password === "admin123") {
-            console.log("✅ [AUTHORIZE] Login MOCK bem-sucedido! Gerando sessão...");
-            return {
-              id: "mock-admin-123",
-              name: "Administrador",
-              email: "admin@vigorre.com",
-              role: "ADM Master",
-              permissions: ["admin:all"],
-            };
+          if (!user || !user.password) {
+            console.log('[auth] Usuário não encontrado');
+            return null;
           }
 
-          console.log("❌ [AUTHORIZE] Credenciais incorretas.");
-          return null;
+          const isValid = await compare(credentials.password as string, user.password);
+          console.log('[auth] Senha válida?', isValid);
+
+          if (!isValid) {
+            return null;
+          }
+
+          if (!user.active) {
+            console.log('[auth] Usuário inativo');
+            return null;
+          }
+
+          await prisma.user.update({
+            where: { id: user.id },
+            data: {
+              lastLoginAt: new Date(),
+            },
+          });
+
+          const permissions = user.roles.flatMap((userRole) =>
+            userRole.role.permissions.map((rp) => rp.permission)
+          );
+
+          const userData = {
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            role: user.roles[0]?.role.name || 'Funcionário',
+            permissions: permissions.map((p) => `${p.module}:${p.action}`),
+          };
+
+          console.log('[auth] Usuário autenticado:', userData.email);
+          return userData;
+
         } catch (error) {
-          console.error("💥 [AUTHORIZE] ERRO FATAL CAPTURADO:", error);
+          console.error('[auth] Erro no authorize:', error);
           return null;
         }
       },
@@ -88,10 +120,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
-        console.log("🚀 [JWT] Usuário autenticado, injetando dados no token...");
         token.id = user.id;
-        token.role = (user as any).role;
-        token.permissions = (user as any).permissions;
+        token.role = user.role;
+        token.permissions = user.permissions;
       }
       return token;
     },
@@ -104,4 +135,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       return session;
     },
   },
-});
+  debug: process.env.NODE_ENV === 'development',
+};
+
+export const { handlers, auth, signIn, signOut } = NextAuth(authConfig);
+
+export async function getServerSession() {
+  const { auth } = await import('@/lib/auth/auth');
+  return auth();
+}
