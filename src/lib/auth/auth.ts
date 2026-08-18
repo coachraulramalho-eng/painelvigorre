@@ -3,7 +3,6 @@ import CredentialsProvider from 'next-auth/providers/credentials';
 import { PrismaAdapter } from '@auth/prisma-adapter';
 import { prisma } from '@/lib/db/prisma';
 import { compare } from 'bcryptjs';
-import { Adapter } from 'next-auth/adapters';
 
 declare module 'next-auth' {
   interface User {
@@ -22,10 +21,12 @@ declare module 'next-auth' {
 }
 
 export const authConfig: NextAuthConfig = {
-  adapter: PrismaAdapter(prisma) as Adapter,
+  // Garante que o NextAuth use a variável de ambiente correta no Vercel
+  secret: process.env.NEXTAUTH_SECRET,
+  adapter: PrismaAdapter(prisma),
   session: {
     strategy: 'jwt',
-    maxAge: 8 * 60 * 60,
+    maxAge: 8 * 60 * 60, // 8 horas
   },
   pages: {
     signIn: '/login',
@@ -75,6 +76,7 @@ export const authConfig: NextAuthConfig = {
           return null;
         }
 
+        // Atualiza o último login
         await prisma.user.update({
           where: { id: user.id },
           data: {
@@ -118,7 +120,7 @@ export const authConfig: NextAuthConfig = {
 
 export const { handlers, auth, signIn, signOut } = NextAuth(authConfig);
 
+// Função auxiliar segura para pegar a sessão no servidor (Server Components)
 export async function getServerSession() {
-  const { auth } = await import('@/lib/auth/auth');
-  return auth();
+  return await auth();
 }
