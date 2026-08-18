@@ -1,25 +1,22 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { getToken } from 'next-auth/jwt';
+import { auth } from '@/lib/auth/auth';
 
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
 
-  // 1. Rotas que NUNCA são bloqueadas (públicas)
+  // 1. Rotas públicas que NUNCA são bloqueadas
   const publicPaths = ['/login', '/assinatura'];
   
   if (publicPaths.some(path => pathname === path || pathname.startsWith(path))) {
     return NextResponse.next();
   }
 
-  // 2. Verifica o token de forma segura (com a senha secreta explícita)
-  const token = await getToken({ 
-    req: request,
-    secret: process.env.NEXTAUTH_SECRET 
-  });
+  // 2. Usa o método oficial e mais estável do NextAuth v5 para verificar sessão
+  const session = await auth();
 
-  // 3. Se não tiver token, manda para o login
-  if (!token) {
+  // 3. Se não houver sessão, redireciona para o login
+  if (!session) {
     const loginUrl = new URL('/login', request.url);
     if (pathname !== '/login') {
       loginUrl.searchParams.set('callbackUrl', pathname);
@@ -30,7 +27,7 @@ export async function middleware(request: NextRequest) {
   return NextResponse.next();
 }
 
-// 4. Configuração de segurança: IGNORA totalmente tudo que for API ou arquivos do sistema
+// 4. Ignora totalmente arquivos estáticos e rotas da API para evitar conflitos
 export const config = {
   matcher: [
     '/((?!api|_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt).*)',
