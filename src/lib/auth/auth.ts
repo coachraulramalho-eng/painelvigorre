@@ -1,27 +1,12 @@
 import NextAuth from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
-import { DefaultSession } from "next-auth";
 
-// Extensão de tipos correta para NextAuth
-declare module "next-auth" {
-  interface User {
-    role?: string;
-    permissions?: string[];
-  }
-  interface Session {
-    user: {
-      id: string;
-      role?: string;
-      permissions?: string[];
-    } & DefaultSession["user"];
-  }
-}
-
-// Chave fixa para contornar o bug do painel do Vercel
+// Chave fixa e direta no código
 const SECRET = "vigorre2026SecretKeyAuth9x8w7v6u5t4s3r2q1p0";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   secret: SECRET,
+  trustHost: true, // <--- ISSO RESOLVE O BLOQUEIO DA URL DE PREVIEW DO VERCEL
   session: {
     strategy: "jwt",
     maxAge: 8 * 60 * 60,
@@ -38,16 +23,20 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         password: { label: "Senha", type: "password" },
       },
       async authorize(credentials) {
-        // MODO MOCK: Permite login sem depender do banco de dados (que está incompleto)
-        if (credentials?.email === "admin@vigorre.com" && credentials?.password === "admin123") {
+        console.log("🚀 [AUTH] Tentativa de login:", credentials?.email);
+        
+        if (credentials?.email?.toLowerCase() === "admin@vigorre.com" && credentials?.password === "admin123") {
+          console.log("✅ [AUTH] Login bem-sucedido! Criando sessão...");
           return {
             id: "mock-admin-123",
-            name: "Administrador Mock",
+            name: "Administrador",
             email: "admin@vigorre.com",
-            role: "ADM Master", // Exatamente o que o dashboard espera
+            role: "ADM Master",
             permissions: ["admin:all"],
           };
         }
+        
+        console.log("❌ [AUTH] Login falhou (credenciais incorretas).");
         return null;
       },
     }),
