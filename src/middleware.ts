@@ -4,7 +4,7 @@ import type { NextRequest } from 'next/server';
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
 
-  // 1. NUNCA interceptar rotas do NextAuth ou arquivos estáticos
+  // Nunca bloquear rotas de autenticação
   if (
     pathname.startsWith('/api/auth') || 
     pathname.startsWith('/_next') || 
@@ -14,12 +14,12 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // 2. Rotas públicas
+  // Rotas públicas
   if (pathname === '/login' || pathname.startsWith('/assinatura')) {
     return NextResponse.next();
   }
 
-  // 3. Verificar cookie de sessão diretamente (100% confiável e leve)
+  // Verificar cookie de sessão
   const sessionCookie = 
     request.cookies.get('authjs.session-token')?.value || 
     request.cookies.get('__Secure-authjs.session-token')?.value;
