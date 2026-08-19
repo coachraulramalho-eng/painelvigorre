@@ -33,7 +33,6 @@ export async function GET(request: NextRequest) {
     if (status) where.status = status;
     if (priority) where.priority = priority;
 
-    // Se não for ADM Master, filtrar por responsável
     if (session.user.role !== 'ADM Master') {
       where.responsibleId = session.user.id;
     }
@@ -99,20 +98,27 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const validatedData = tarefaSchema.parse(body);
 
+    // 🔥 CONSTRUIR OBJETO DE DADOS DINAMICAMENTE
+    const data: any = {
+      title: validatedData.title,
+      description: validatedData.description,
+      priority: validatedData.priority,
+      status: validatedData.status,
+      leadId: validatedData.leadId,
+      proposalId: validatedData.proposalId,
+      contractId: validatedData.contractId,
+      companyId: validatedData.companyId,
+      notes: validatedData.notes,
+      responsibleId: session.user.id,
+    };
+
+    // 🔥 SÓ ADICIONAR dueDate SE FOR FORNECIDA
+    if (validatedData.dueDate) {
+      data.dueDate = new Date(validatedData.dueDate);
+    }
+
     const tarefa = await prisma.task.create({
-      data: {
-        title: validatedData.title,
-        description: validatedData.description,
-        priority: validatedData.priority,
-        dueDate: validatedData.dueDate ? new Date(validatedData.dueDate) : undefined,
-        status: validatedData.status,
-        leadId: validatedData.leadId,
-        proposalId: validatedData.proposalId,
-        contractId: validatedData.contractId,
-        companyId: validatedData.companyId,
-        notes: validatedData.notes,
-        responsibleId: session.user.id,
-      },
+      data,
       include: {
         responsible: {
           select: {
