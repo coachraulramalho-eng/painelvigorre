@@ -109,17 +109,31 @@ export async function PUT(
       );
     }
 
-    // Se for concluída, marcar completedAt
-    if (validatedData.status === 'Concluída' && existingTarefa.status !== 'Concluída') {
-      validatedData.completedAt = new Date().toISOString();
-    }
+    // 🔥 CONSTRUIR OBJETO DE DADOS DINAMICAMENTE
+    const updateData: any = {};
 
-    const updateData: any = { ...validatedData };
-    if (validatedData.dueDate) {
-      updateData.dueDate = new Date(validatedData.dueDate);
+    if (validatedData.title !== undefined) updateData.title = validatedData.title;
+    if (validatedData.description !== undefined) updateData.description = validatedData.description;
+    if (validatedData.priority !== undefined) updateData.priority = validatedData.priority;
+    if (validatedData.status !== undefined) {
+      updateData.status = validatedData.status;
+      // Se for concluída, marcar completedAt
+      if (validatedData.status === 'Concluída' && existingTarefa.status !== 'Concluída') {
+        updateData.completedAt = new Date();
+      }
     }
-    if (validatedData.completedAt) {
-      updateData.completedAt = new Date(validatedData.completedAt);
+    if (validatedData.leadId !== undefined) updateData.leadId = validatedData.leadId;
+    if (validatedData.proposalId !== undefined) updateData.proposalId = validatedData.proposalId;
+    if (validatedData.contractId !== undefined) updateData.contractId = validatedData.contractId;
+    if (validatedData.companyId !== undefined) updateData.companyId = validatedData.companyId;
+    if (validatedData.notes !== undefined) updateData.notes = validatedData.notes;
+
+    // 🔥 SÓ ADICIONAR dueDate SE FOR FORNECIDA
+    if (validatedData.dueDate !== undefined) {
+      updateData.dueDate = validatedData.dueDate ? new Date(validatedData.dueDate) : undefined;
+    }
+    if (validatedData.completedAt !== undefined) {
+      updateData.completedAt = validatedData.completedAt ? new Date(validatedData.completedAt) : undefined;
     }
 
     const tarefa = await prisma.task.update({
