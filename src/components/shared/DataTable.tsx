@@ -16,7 +16,8 @@ import {
   ChevronRight, 
   Search,
   Filter,
-  Download 
+  Download,
+  Loader2
 } from 'lucide-react';
 import { cn } from '@/lib/utils/format';
 
@@ -30,6 +31,7 @@ interface Column {
 interface DataTableProps {
   columns: Column[];
   data: any[];
+  loading?: boolean;
   searchPlaceholder?: string;
   showSearch?: boolean;
   showFilters?: boolean;
@@ -44,6 +46,7 @@ interface DataTableProps {
 export function DataTable({
   columns,
   data,
+  loading = false,
   searchPlaceholder = 'Buscar...',
   showSearch = true,
   showFilters = true,
@@ -73,6 +76,14 @@ export function DataTable({
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className={cn('space-y-4', className)}>
