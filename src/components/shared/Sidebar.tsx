@@ -15,6 +15,7 @@ import {
   LogOut,
 } from 'lucide-react';
 
+// 🔥 MENU ITEMS COM TIPAGEM CORRETA
 const menuItems = [
   { icon: LayoutDashboard, label: 'Dashboard', href: '/' },
   { icon: Briefcase, label: 'Comercial', href: '/comercial/crm' },
@@ -42,7 +43,7 @@ export function Sidebar() {
           </div>
         </div>
 
-        {/* 🔥 MENU - SEMPRE EXPANDIDO */}
+        {/* Menu */}
         <nav className="flex-1 overflow-y-auto py-4">
           <ul className="space-y-1 px-2">
             {menuItems.map((item) => {
