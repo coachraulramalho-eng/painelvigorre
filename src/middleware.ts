@@ -1,29 +1,54 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { auth } from '@/lib/auth/auth';
 
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
 
-  // 1. Permitir a página de login
-  if (pathname === '/login') {
+  // 🔥 ROTAS PÚBLICAS - NUNCA BLOQUEAR
+  const publicPaths = [
+    '/login',
+    '/api/auth',
+    '/api/debug',
+    '/api/diagnostic',
+    '/api/health',
+    '/_next',
+    '/favicon.ico',
+    '/logo.svg',
+    '/media',
+    '/assinatura',
+  ];
+
+  const isPublicPath = publicPaths.some(
+    (path) => pathname === path || pathname.startsWith(path)
+  );
+
+  if (isPublicPath) {
     return NextResponse.next();
   }
 
-  // 2. Verificar cookie de sessão
-  const sessionCookie = 
-    request.cookies.get('authjs.session-token')?.value || 
-    request.cookies.get('__Secure-authjs.session-token')?.value;
+  // 🔥 USAR auth() EM VEZ DE getToken() - MAIS CONFIÁVEL
+  try {
+    const session = await auth();
+    console.log('[middleware] Session existe?', !!session);
+    console.log('[middleware] Usuário:', session?.user?.email || 'none');
 
-  if (!sessionCookie) {
+    if (!session) {
+      const loginUrl = new URL('/login', request.url);
+      loginUrl.searchParams.set('callbackUrl', pathname);
+      return NextResponse.redirect(loginUrl);
+    }
+
+    return NextResponse.next();
+  } catch (error) {
+    console.error('[middleware] Erro:', error);
     const loginUrl = new URL('/login', request.url);
-    loginUrl.searchParams.set('callbackUrl', pathname);
     return NextResponse.redirect(loginUrl);
   }
-
-  return NextResponse.next();
 }
 
 export const config = {
-  // O SEGREDO ESTÁ AQUI: '?!api/auth' impede que o middleware rode nas rotas de autenticação
-  matcher: ['/((?!api/auth|_next/static|_next/image|favicon.ico|.*\\.(?:png|jpg|jpeg|gif|svg|ico|webp)$).*)'],
+  matcher: [
+    '/((?!api/auth|api/debug|api/diagnostic|api/health|_next/static|_next/image|favicon.ico|logo.svg|media|assinatura).*)',
+  ],
 };
