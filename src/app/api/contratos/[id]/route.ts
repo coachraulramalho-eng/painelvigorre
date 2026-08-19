@@ -102,18 +102,25 @@ export async function PUT(
       );
     }
 
+    // 🔥 CONVERTER DATAS CORRETAMENTE
     const updateData: any = { ...validatedData };
     if (validatedData.value) {
       updateData.value = parseFloat(validatedData.value);
     }
     if (validatedData.startDate) {
       updateData.startDate = new Date(validatedData.startDate);
+    } else if (validatedData.startDate === '') {
+      updateData.startDate = null;
     }
     if (validatedData.endDate) {
       updateData.endDate = new Date(validatedData.endDate);
+    } else if (validatedData.endDate === '') {
+      updateData.endDate = null;
     }
     if (validatedData.renewalDate) {
       updateData.renewalDate = new Date(validatedData.renewalDate);
+    } else if (validatedData.renewalDate === '') {
+      updateData.renewalDate = null;
     }
 
     const contrato = await prisma.contract.update({
