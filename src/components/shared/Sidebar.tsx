@@ -144,16 +144,17 @@ export function Sidebar() {
   return (
     <aside
       className={cn(
-        'fixed left-0 top-0 z-40 h-screen bg-primary transition-all duration-300',
+        'fixed left-0 top-0 z-40 h-screen transition-all duration-300',
+        'bg-[#0B2B4A]', // 🔥 COR ORIGINAL DO VIGORRE
         collapsed ? 'w-20' : 'w-64'
       )}
     >
       <div className="flex h-full flex-col">
         {/* Logo */}
-        <div className="flex h-16 items-center justify-between px-4 border-b border-primary-foreground/10">
+        <div className="flex h-16 items-center justify-between px-4 border-b border-white/10">
           <div className={cn('flex items-center gap-2', collapsed && 'justify-center w-full')}>
             <div className="h-8 w-8 bg-white rounded-lg flex items-center justify-center flex-shrink-0">
-              <span className="text-primary font-bold text-sm">V</span>
+              <span className="text-[#0B2B4A] font-bold text-sm">V</span>
             </div>
             {!collapsed && (
               <span className="text-white font-bold text-lg truncate">Vigorre ADM</span>
@@ -194,7 +195,7 @@ export function Sidebar() {
                         {hasSubItems && (
                           <ChevronLeft
                             className={cn(
-                              'h-4 w-4 transition-transform',
+                              'h-4 w-4 transition-transform text-white/50',
                               isExpanded ? '-rotate-90' : ''
                             )}
                           />
@@ -234,7 +235,7 @@ export function Sidebar() {
         </nav>
 
         {/* Usuário */}
-        <div className="border-t border-primary-foreground/10 p-4">
+        <div className="border-t border-white/10 p-4">
           <div className={cn('flex items-center gap-3', collapsed && 'justify-center')}>
             <div className="h-8 w-8 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
               <span className="text-white text-sm font-semibold">
@@ -269,9 +270,9 @@ export function Sidebar() {
           className="hidden lg:flex absolute -right-3 top-20 h-6 w-6 rounded-full bg-white border shadow-md items-center justify-center hover:bg-gray-50 transition-colors"
         >
           {collapsed ? (
-            <ChevronRight className="h-3 w-3 text-primary" />
+            <ChevronRight className="h-3 w-3 text-[#0B2B4A]" />
           ) : (
-            <ChevronLeft className="h-3 w-3 text-primary" />
+            <ChevronLeft className="h-3 w-3 text-[#0B2B4A]" />
           )}
         </button>
       </div>
