@@ -8,8 +8,18 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Plus, Eye, Edit, Trash2, FileSignature } from 'lucide-react';
 
+interface Contrato {
+  id: string;
+  title: string;
+  company: string;
+  value: string;
+  startDate: string;
+  endDate: string;
+  status: string;
+}
+
 export default function ContratosPage() {
-  const [contratos, setContratos] = useState([]);
+  const [contratos, setContratos] = useState<Contrato[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -46,13 +56,17 @@ export default function ContratosPage() {
     { key: 'value', label: 'Valor' },
     { key: 'startDate', label: 'Início' },
     { key: 'endDate', label: 'Término' },
-    { key: 'status', label: 'Status', render: (value) => (
-      <Badge variant={getStatusBadge(value)}>{value}</Badge>
-    )},
+    { 
+      key: 'status', 
+      label: 'Status', 
+      render: (value: string) => (
+        <Badge variant={getStatusBadge(value)}>{value}</Badge>
+      )
+    },
     {
       key: 'actions',
       label: 'Ações',
-      render: (_, row) => (
+      render: (_: any, row: Contrato) => (
         <div className="flex gap-1">
           <Button variant="ghost" size="icon" className="h-8 w-8">
             <FileSignature className="h-4 w-4" />
