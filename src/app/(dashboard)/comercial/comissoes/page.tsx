@@ -8,10 +8,25 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Eye, DollarSign, CheckCircle } from 'lucide-react';
 
+interface Comissao {
+  id: string;
+  representative: string;
+  proposal: string;
+  value: number;
+  status: string;
+  paymentDate: string;
+}
+
+interface Metrics {
+  totalPendente: number;
+  totalPago: number;
+  totalPrevisto: number;
+}
+
 export default function ComissoesPage() {
-  const [comissoes, setComissoes] = useState([]);
+  const [comissoes, setComissoes] = useState<Comissao[]>([]);
   const [loading, setLoading] = useState(true);
-  const [metrics, setMetrics] = useState({
+  const [metrics, setMetrics] = useState<Metrics>({
     totalPendente: 0,
     totalPago: 0,
     totalPrevisto: 0,
@@ -56,15 +71,23 @@ export default function ComissoesPage() {
   const columns = [
     { key: 'representative', label: 'Representante' },
     { key: 'proposal', label: 'Proposta' },
-    { key: 'value', label: 'Valor', render: (value) => formatCurrency(value) },
-    { key: 'status', label: 'Status', render: (value) => (
-      <Badge variant={getStatusBadge(value)}>{value}</Badge>
-    )},
+    { 
+      key: 'value', 
+      label: 'Valor', 
+      render: (value: number) => formatCurrency(value) 
+    },
+    { 
+      key: 'status', 
+      label: 'Status', 
+      render: (value: string) => (
+        <Badge variant={getStatusBadge(value)}>{value}</Badge>
+      )
+    },
     { key: 'paymentDate', label: 'Data Pagamento' },
     {
       key: 'actions',
       label: 'Ações',
-      render: (_, row) => (
+      render: (_: any, row: Comissao) => (
         <div className="flex gap-1">
           {row.status === 'Pendente' && (
             <Button variant="ghost" size="icon" className="h-8 w-8 text-success">
