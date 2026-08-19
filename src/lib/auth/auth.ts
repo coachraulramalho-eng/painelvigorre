@@ -2,16 +2,8 @@ import NextAuth from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
-  // Segredo embutido para eliminar qualquer dúvida sobre variáveis de ambiente
-  secret: "vigorre2026SecretKeyAuth9x8w7v6u5t4s3r2q1p0",
-  
-  // Permite que funcione em qualquer URL (Preview ou Produção do Vercel)
-  trustHost: true, 
-  
-  session: {
-    strategy: "jwt",
-  },
-  
+  secret: process.env.NEXTAUTH_SECRET || "vigorre2026SecretKeyAuth9x8w7v6u5t4s3r2q1p0",
+  trustHost: true,
   providers: [
     CredentialsProvider({
       name: "credentials",
@@ -20,25 +12,19 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         password: { label: "Senha", type: "password" },
       },
       async authorize(credentials) {
-        const email = String(credentials?.email || "").toLowerCase().trim();
-        const password = String(credentials?.password || "").trim();
-
-        // MOCK: Se bater isso, ele cria a sessão sem tocar no banco de dados
-        if (email === "admin@vigorre.com" && password === "admin123") {
+        if (credentials?.email === "admin@vigorre.com" && credentials?.password === "admin123") {
           return {
-            id: "mock-admin-123",
+            id: "1",
             name: "Administrador",
             email: "admin@vigorre.com",
             role: "ADM Master",
             permissions: ["admin:all"],
           };
         }
-        
         return null;
       },
     }),
   ],
-  
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
