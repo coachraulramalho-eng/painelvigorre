@@ -6,10 +6,19 @@ import { PageHeader } from '@/components/shared/PageHeader';
 import { DataTable } from '@/components/shared/DataTable';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Eye, Edit, Trash2, CheckCircle, Clock } from 'lucide-react';
+import { Plus, Eye, Edit, Trash2, CheckCircle } from 'lucide-react';
+
+interface Followup {
+  id: string;
+  lead: string;
+  description: string;
+  date: string;
+  status: string;
+  responsible: string;
+}
 
 export default function FollowupsPage() {
-  const [followups, setFollowups] = useState([]);
+  const [followups, setFollowups] = useState<Followup[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -44,14 +53,18 @@ export default function FollowupsPage() {
     { key: 'lead', label: 'Lead' },
     { key: 'description', label: 'Descrição' },
     { key: 'date', label: 'Data' },
-    { key: 'status', label: 'Status', render: (value) => (
-      <Badge variant={getStatusBadge(value)}>{value}</Badge>
-    )},
+    { 
+      key: 'status', 
+      label: 'Status', 
+      render: (value: string) => (
+        <Badge variant={getStatusBadge(value)}>{value}</Badge>
+      )
+    },
     { key: 'responsible', label: 'Responsável' },
     {
       key: 'actions',
       label: 'Ações',
-      render: (_, row) => (
+      render: (_: any, row: Followup) => (
         <div className="flex gap-1">
           <Button variant="ghost" size="icon" className="h-8 w-8">
             <CheckCircle className="h-4 w-4 text-success" />
