@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { PageHeader } from '@/components/shared/PageHeader';
-import { ArrowLeft, Save, Loader2 } from 'lucide-react';
+import { ArrowLeft, Save, Loader2, Shield, Plus, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 
 const MODULES = [
@@ -45,6 +45,18 @@ export default function NovoPerfilPage() {
       permissions: prev.permissions.includes(permissionId)
         ? prev.permissions.filter(p => p !== permissionId)
         : [...prev.permissions, permissionId],
+    }));
+  };
+
+  const toggleAllModulePermissions = (moduleId: string, actions: string[]) => {
+    const modulePermissions = actions.map(action => `${moduleId}:${action}`);
+    const allSelected = modulePermissions.every(p => formData.permissions.includes(p));
+
+    setFormData(prev => ({
+      ...prev,
+      permissions: allSelected
+        ? prev.permissions.filter(p => !modulePermissions.includes(p))
+        : [...prev.permissions, ...modulePermissions.filter(p => !prev.permissions.includes(p))],
     }));
   };
 
@@ -91,7 +103,10 @@ export default function NovoPerfilPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Informações do Perfil</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <Shield className="h-5 w-5" />
+            Informações do Perfil
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
@@ -126,33 +141,83 @@ export default function NovoPerfilPage() {
                   onChange={handleChange}
                 />
               </div>
+
+              <div className="space-y-2 col-span-2">
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="isMaster"
+                    checked={formData.isMaster}
+                    onCheckedChange={(checked) => 
+                      setFormData({ ...formData, isMaster: checked as boolean })
+                    }
+                  />
+                  <Label htmlFor="isMaster" className="text-sm font-normal">
+                    Perfil Master (acesso total ao sistema)
+                  </Label>
+                </div>
+              </div>
             </div>
 
             <div className="space-y-4">
-              <Label>Permissões por Módulo</Label>
+              <div className="flex items-center justify-between">
+                <Label>Permissões por Módulo</Label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const allPermissions = MODULES.flatMap(m => 
+                      m.actions.map(a => `${m.id}:${a}`)
+                    );
+                    const allSelected = allPermissions.every(p => formData.permissions.includes(p));
+                    setFormData(prev => ({
+                      ...prev,
+                      permissions: allSelected ? [] : allPermissions,
+                    }));
+                  }}
+                >
+                  {MODULES.flatMap(m => m.actions).every(a => 
+                    formData.permissions.includes(`${MODULES[0]?.id}:${a}`)
+                  ) ? 'Desmarcar Todos' : 'Selecionar Todos'}
+                </Button>
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {MODULES.map((module) => (
-                  <Card key={module.id} className="p-4">
-                    <h4 className="font-medium mb-2">{module.label}</h4>
-                    <div className="space-y-2">
-                      {module.actions.map((action) => (
-                        <div key={`${module.id}-${action}`} className="flex items-center gap-2">
-                          <Checkbox
-                            id={`${module.id}-${action}`}
-                            checked={formData.permissions.includes(`${module.id}:${action}`)}
-                            onCheckedChange={() => togglePermission(`${module.id}:${action}`)}
-                          />
-                          <Label 
-                            htmlFor={`${module.id}-${action}`}
-                            className="text-sm capitalize"
-                          >
-                            {action}
-                          </Label>
-                        </div>
-                      ))}
-                    </div>
-                  </Card>
-                ))}
+                {MODULES.map((module) => {
+                  const modulePermissions = module.actions.map(action => `${module.id}:${action}`);
+                  const allSelected = modulePermissions.every(p => formData.permissions.includes(p));
+                  const someSelected = modulePermissions.some(p => formData.permissions.includes(p));
+
+                  return (
+                    <Card key={module.id} className="p-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className="font-medium">{module.label}</h4>
+                        <Checkbox
+                          checked={allSelected}
+                          onCheckedChange={() => toggleAllModulePermissions(module.id, module.actions)}
+                          className={someSelected && !allSelected ? 'opacity-50' : ''}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        {module.actions.map((action) => (
+                          <div key={`${module.id}-${action}`} className="flex items-center gap-2">
+                            <Checkbox
+                              id={`${module.id}-${action}`}
+                              checked={formData.permissions.includes(`${module.id}:${action}`)}
+                              onCheckedChange={() => togglePermission(`${module.id}:${action}`)}
+                            />
+                            <Label 
+                              htmlFor={`${module.id}-${action}`}
+                              className="text-sm capitalize cursor-pointer"
+                            >
+                              {action}
+                            </Label>
+                          </div>
+                        ))}
+                      </div>
+                    </Card>
+                  );
+                })}
               </div>
             </div>
 
@@ -164,12 +229,12 @@ export default function NovoPerfilPage() {
                 {loading ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                    Salvando...
+                    Criando...
                   </>
                 ) : (
                   <>
                     <Save className="h-4 w-4 mr-2" />
-                    Salvar Perfil
+                    Criar Perfil
                   </>
                 )}
               </Button>
