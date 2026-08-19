@@ -4,10 +4,12 @@ import type { NextRequest } from 'next/server';
 export function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
 
-  if (pathname === '/login' || pathname.startsWith('/assinatura')) {
+  // 1. Permitir a página de login
+  if (pathname === '/login') {
     return NextResponse.next();
   }
 
+  // 2. Verificar cookie de sessão
   const sessionCookie = 
     request.cookies.get('authjs.session-token')?.value || 
     request.cookies.get('__Secure-authjs.session-token')?.value;
@@ -22,5 +24,6 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)'],
+  // O SEGREDO ESTÁ AQUI: '?!api/auth' impede que o middleware rode nas rotas de autenticação
+  matcher: ['/((?!api/auth|_next/static|_next/image|favicon.ico|.*\\.(?:png|jpg|jpeg|gif|svg|ico|webp)$).*)'],
 };
