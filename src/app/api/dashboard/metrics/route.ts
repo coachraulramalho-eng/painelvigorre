@@ -1,11 +1,10 @@
 import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/server';
-import { auth } from '@/lib/auth/auth'; // ✅ Usamos a função auth() em vez de getToken()
+import { auth } from '@/lib/auth/auth';
 import { prisma } from '@/lib/db/prisma';
 
-export async function GET(request: NextRequest) {
+export async function GET(request: Request) {
   try {
-    // ✅ 1. Verificação de autenticação robusta para NextAuth v5
+    // 1. Verificar autenticação usando a função auth() (Recomendado para NextAuth v5)
     const session = await auth();
 
     if (!session?.user) {
@@ -15,7 +14,7 @@ export async function GET(request: NextRequest) {
     const userId = session.user.id;
     const userRole = (session.user as any).role;
 
-    // ✅ 2. Execução em paralelo (Promise.all) para evitar timeout no Vercel
+    // 2. Buscar métricas em paralelo para ser mais rápido e evitar timeout
     const [
       leadsCount, leadsNew, leadsQualified, leadsConverted,
       proposalsTotal, proposalsSent, proposalsNegotiation, proposalsWon, proposalsLost,
@@ -25,7 +24,6 @@ export async function GET(request: NextRequest) {
       contractsActive, expiringContracts,
       tasksPending, tasksOverdue
     ] = await Promise.all([
-      // Comercial
       prisma.lead.count(),
       prisma.lead.count({ where: { status: 'Novo' } }),
       prisma.lead.count({ where: { status: 'Qualificado' } }),
@@ -35,35 +33,21 @@ export async function GET(request: NextRequest) {
       prisma.proposal.count({ where: { status: { in: ['Em negociação', 'Aguardando decisão'] } } }),
       prisma.proposal.count({ where: { status: 'Ganha' } }),
       prisma.proposal.count({ where: { status: 'Perdida' } }),
-      
-      // Financeiro
       prisma.accountReceivable.aggregate({ where: { status: { not: 'Recebido' } }, _sum: { value: true } }),
       prisma.accountReceivable.aggregate({ where: { status: 'Recebido' }, _sum: { value: true } }),
       prisma.accountReceivable.count({ where: { status: { not: 'Recebido' }, dueDate: { lt: new Date() } } }),
       prisma.accountPayable.aggregate({ where: { status: { not: 'Pago' } }, _sum: { value: true } }),
       prisma.accountPayable.aggregate({ where: { status: 'Pago' }, _sum: { value: true } }),
       prisma.accountPayable.count({ where: { status: { not: 'Pago' }, dueDate: { lt: new Date() } } }),
-      
-      // Representantes
       prisma.representative.count({ where: { status: 'Ativo' } }),
       prisma.commission.aggregate({ _sum: { value: true } }),
       prisma.commission.count({ where: { status: 'Pendente' } }),
-      
-      // Contratos
       prisma.contract.count({ where: { status: 'Ativo' } }),
-      prisma.contract.count({
-        where: {
-          status: 'Ativo',
-          endDate: { lte: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), gte: new Date() },
-        },
-      }),
-      
-      // Tarefas
+      prisma.contract.count({ where: { status: 'Ativo', endDate: { lte: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), gte: new Date() } } }),
       prisma.task.count({ where: { status: { not: 'Concluída' } } }),
       prisma.task.count({ where: { status: { not: 'Concluída' }, dueDate: { lt: new Date() } } }),
     ]);
 
-    // ✅ 3. Consultas condicionais do usuário (apenas se não for ADM Master)
     let userLeads = 0;
     let userProposals = 0;
     let userTasks = 0;
@@ -79,7 +63,6 @@ export async function GET(request: NextRequest) {
       userTasks = uTasks;
     }
 
-    // Converter valores do Prisma Decimal para number
     const totalPaidValue = Number(totalPaid._sum.value) || 0;
     const totalPaidExpensesValue = Number(totalPaidExpenses._sum.value) || 0;
     const totalReceivableValue = Number(totalReceivable._sum.value) || 0;
@@ -113,10 +96,16 @@ export async function GET(request: NextRequest) {
       },
       timestamp: new Date().toISOString(),
     });
-    
+
   } catch (error) {
+    // 3. TRATAMENTO DE ERRO: Se o banco falhar, devolvemos JSON, não HTML!
     console.error('💥 [API METRICS] Erro crítico ao buscar métricas:', error);
-    // ✅ Retorna JSON de erro em vez de deixar o Next.js crashar e devolver HTML
-    return NextResponse.json({ error: 'Erro interno ao buscar métricas' }, { status: 500 });
+    return NextResponse.json(
+      { 
+        error: 'Erro interno ao buscar métricas', 
+        details: process.env.NODE_ENV === 'development' ? String(error) : 'Verifique os logs do Vercel' 
+      }, 
+      { status: 500 }
+    );
   }
 }
