@@ -59,7 +59,7 @@ export async function GET(request: NextRequest) {
       orderBy: { createdAt: 'desc' },
     });
 
-    // Formatar dados
+    // Formatar dados com validação de tipos
     const formatted = agreements.map((agreement) => ({
       id: agreement.id,
       representativeId: agreement.representativeId,
@@ -72,7 +72,7 @@ export async function GET(request: NextRequest) {
       calculationBase: agreement.calculationBase,
       validityStart: agreement.validityStart,
       validityEnd: agreement.validityEnd,
-      status: agreement.status,
+      status: agreement.status || 'Ativo',
       notes: agreement.notes,
       createdAt: agreement.createdAt,
     }));
@@ -129,19 +129,37 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Construir dados de criação
+    const createData: any = {
+      representativeId: validatedData.representativeId,
+      service: validatedData.service,
+      calculationBase: validatedData.calculationBase,
+      status: validatedData.status,
+      notes: validatedData.notes,
+    };
+
+    if (validatedData.companyId) {
+      createData.companyId = validatedData.companyId;
+    }
+
+    if (validatedData.percentage) {
+      createData.percentage = parseFloat(validatedData.percentage);
+    }
+
+    if (validatedData.fixedValue) {
+      createData.fixedValue = parseFloat(validatedData.fixedValue);
+    }
+
+    if (validatedData.validityStart) {
+      createData.validityStart = new Date(validatedData.validityStart);
+    }
+
+    if (validatedData.validityEnd) {
+      createData.validityEnd = new Date(validatedData.validityEnd);
+    }
+
     const agreement = await prisma.commercialAgreement.create({
-      data: {
-        representativeId: validatedData.representativeId,
-        companyId: validatedData.companyId || null,
-        service: validatedData.service,
-        percentage: validatedData.percentage ? parseFloat(validatedData.percentage) : null,
-        fixedValue: validatedData.fixedValue ? parseFloat(validatedData.fixedValue) : null,
-        calculationBase: validatedData.calculationBase,
-        validityStart: validatedData.validityStart ? new Date(validatedData.validityStart) : undefined,
-        validityEnd: validatedData.validityEnd ? new Date(validatedData.validityEnd) : undefined,
-        status: validatedData.status,
-        notes: validatedData.notes,
-      },
+      data: createData,
       include: {
         representative: {
           include: {
