@@ -63,18 +63,18 @@ export default function EditarRepresentantePage() {
       const response = await fetch(`/api/comercial/representantes/${repId}`);
       if (response.ok) {
         const data = await response.json();
-        setRepresentante(data);
+        setRepresentante(data.representative);
         setFormData({
-          type: data.type || 'Autônomo/Pessoa Física',
-          document: data.document || '',
-          phone: data.phone || '',
-          email: data.email || '',
-          address: data.address || '',
-          region: data.region || '',
-          services: data.services || '',
-          bankData: data.bankData || '',
-          pix: data.pix || '',
-          status: data.status || 'Ativo',
+          type: data.representative.type || 'Autônomo/Pessoa Física',
+          document: data.representative.document || '',
+          phone: data.representative.phone || '',
+          email: data.representative.email || '',
+          address: data.representative.address || '',
+          region: data.representative.region || '',
+          services: data.representative.services || '',
+          bankData: data.representative.bankData || '',
+          pix: data.representative.pix || '',
+          status: data.representative.status || 'Ativo',
         });
       }
     } catch (error) {
