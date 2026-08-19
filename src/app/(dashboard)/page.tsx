@@ -2,9 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
+import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Progress } from '@/components/ui/progress';
 import { 
   TrendingUp, 
   TrendingDown, 
@@ -19,9 +21,14 @@ import {
   UserPlus,
   FileSignature,
   Eye,
-  Loader2
+  Loader2,
+  Calendar,
+  ArrowUpRight,
+  ArrowDownRight,
+  BarChart3,
+  PieChart,
+  Activity
 } from 'lucide-react';
-import Link from 'next/link';
 
 interface DashboardMetrics {
   commercial: {
@@ -49,9 +56,6 @@ export default function DashboardPage() {
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  // Correção de Tipo Segura para o TypeScript do Vercel
-  const user = session?.user as { role?: string; name?: string } | undefined;
 
   useEffect(() => {
     loadMetrics();
@@ -107,10 +111,11 @@ export default function DashboardPage() {
     return null;
   }
 
-  const isMaster = user?.role === 'ADM Master';
+  const isMaster = session?.user?.role === 'ADM Master';
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-primary">
@@ -119,15 +124,16 @@ export default function DashboardPage() {
           <p className="text-muted-foreground">
             {isMaster 
               ? 'Visão completa da empresa' 
-              : `Bem-vindo, ${user?.name || 'Usuário'}`
+              : `Bem-vindo, ${session?.user?.name || 'Usuário'}`
             }
           </p>
         </div>
         <Badge variant="outline" className="px-4 py-2">
-          {user?.role || 'Funcionário'}
+          {session?.user?.role || 'Funcionário'}
         </Badge>
       </div>
 
+      {/* Métricas do Usuário (para não-ADM) */}
       {!isMaster && metrics.user && (
         <div className="grid gap-4 md:grid-cols-3">
           <Card>
@@ -168,7 +174,15 @@ export default function DashboardPage() {
         </div>
       )}
 
-      <h2 className="text-lg font-semibold text-primary">📊 Leads</h2>
+      {/* LEADS */}
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-semibold text-primary">📊 Leads</h2>
+        <Button variant="ghost" size="sm" asChild>
+          <Link href="/comercial/leads">
+            Ver todos <ArrowUpRight className="h-4 w-4 ml-1" />
+          </Link>
+        </Button>
+      </div>
       <div className="grid gap-4 md:grid-cols-4">
         <Card>
           <CardContent className="p-6">
@@ -196,7 +210,15 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      <h2 className="text-lg font-semibold text-primary">📄 Propostas</h2>
+      {/* PROPOSTAS */}
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-semibold text-primary">📄 Propostas</h2>
+        <Button variant="ghost" size="sm" asChild>
+          <Link href="/comercial/propostas">
+            Ver todos <ArrowUpRight className="h-4 w-4 ml-1" />
+          </Link>
+        </Button>
+      </div>
       <div className="grid gap-4 md:grid-cols-5">
         <Card>
           <CardContent className="p-6">
@@ -230,6 +252,7 @@ export default function DashboardPage() {
         </Card>
       </div>
 
+      {/* Taxa de Conversão */}
       <Card>
         <CardContent className="p-6">
           <div className="flex items-center justify-between">
@@ -243,12 +266,24 @@ export default function DashboardPage() {
               </span>
             </div>
           </div>
+          <Progress 
+            value={metrics.commercial.proposals.conversionRate} 
+            className="mt-4 h-2"
+          />
         </CardContent>
       </Card>
 
+      {/* FINANCEIRO (apenas ADM Master) */}
       {isMaster && (
         <>
-          <h2 className="text-lg font-semibold text-primary">💰 Financeiro</h2>
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-primary">💰 Financeiro</h2>
+            <Button variant="ghost" size="sm" asChild>
+              <Link href="/financeiro/contas-receber">
+                Ver todos <ArrowUpRight className="h-4 w-4 ml-1" />
+              </Link>
+            </Button>
+          </div>
           <div className="grid gap-4 md:grid-cols-4">
             <Card>
               <CardContent className="p-6">
@@ -304,6 +339,7 @@ export default function DashboardPage() {
             </Card>
           </div>
 
+          {/* REPRESENTANTES, CONTRATOS, TAREFAS */}
           <div className="grid gap-4 md:grid-cols-3">
             <Card>
               <CardHeader>
@@ -364,6 +400,7 @@ export default function DashboardPage() {
         </>
       )}
 
+      {/* Ações Rápidas */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Button asChild className="gap-2">
           <Link href="/comercial/leads/novo">
