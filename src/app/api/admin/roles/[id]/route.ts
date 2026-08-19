@@ -114,12 +114,13 @@ export async function PUT(
       );
     }
 
-    // Atualizar role
+    // Construir dados de atualização
     const updateData: any = {};
     if (validatedData.name) updateData.name = validatedData.name;
     if (validatedData.description !== undefined) updateData.description = validatedData.description;
     if (validatedData.isMaster !== undefined) updateData.isMaster = validatedData.isMaster;
 
+    // Atualizar role
     const role = await prisma.role.update({
       where: { id },
       data: updateData,
@@ -165,11 +166,12 @@ export async function PUT(
       }
     }
 
+    // Registrar auditoria
     await prisma.auditLog.create({
       data: {
         userId: session.user.id,
         action: 'UPDATE',
-        module: 'security',
+        module: 'admin',
         recordId: id,
         oldData: existingRole,
         newData: role,
@@ -247,7 +249,7 @@ export async function DELETE(
       data: {
         userId: session.user.id,
         action: 'DELETE',
-        module: 'security',
+        module: 'admin',
         recordId: id,
         oldData: existingRole,
         ipAddress: request.headers.get('x-forwarded-for') || '',
