@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { prisma } from '@/lib/db/prisma';
-import { getToken } from 'next-auth/jwt';
+import { auth } from '@/lib/auth/auth';
 import { z } from 'zod';
 
-const representativeSchema = z.object({
+const representanteSchema = z.object({
   userId: z.string().min(1, 'Usuário é obrigatório'),
   type: z.string().min(1, 'Tipo é obrigatório'),
   document: z.string().min(1, 'Documento é obrigatório'),
@@ -15,33 +15,37 @@ const representativeSchema = z.object({
   services: z.string().optional(),
   bankData: z.string().optional(),
   pix: z.string().optional(),
-  contractFile: z.string().optional(),
   status: z.string().default('Ativo'),
 });
 
 export async function GET(request: NextRequest) {
   try {
-    const token = await getToken({ req: request as any });
-    
-    if (!token) {
-      return NextResponse.json(
-        { error: 'Não autenticado' },
-        { status: 401 }
-      );
+    const session = await auth();
+    if (!session) {
+      return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
     }
 
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status');
     const region = searchParams.get('region');
+    const search = searchParams.get('search');
 
     const where: any = {};
     if (status) where.status = status;
     if (region) where.region = region;
+    if (search) {
+      where.OR = [
+        { user: { name: { contains: search, mode: 'insensitive' } } },
+        { document: { contains: search, mode: 'insensitive' } },
+        { email: { contains: search, mode: 'insensitive' } },
+      ];
+    }
 
-    if (token.role !== 'ADM Master') {
-      const userPermissions = token.permissions as string[] || [];
+    // Se não for ADM Master, mostrar apenas seus representantes
+    if (session.user.role !== 'ADM Master') {
+      const userPermissions = session.user.permissions || [];
       if (!userPermissions.includes('commercial:view:all')) {
-        where.userId = token.id;
+        where.userId = session.user.id;
       }
     }
 
@@ -72,9 +76,31 @@ export async function GET(request: NextRequest) {
       orderBy: { createdAt: 'desc' },
     });
 
+    // Formatar dados
+    const formatted = representatives.map((rep) => ({
+      id: rep.id,
+      userId: rep.userId,
+      name: rep.user?.name || 'N/A',
+      email: rep.user?.email || '',
+      type: rep.type,
+      document: rep.document,
+      phone: rep.phone,
+      address: rep.address,
+      region: rep.region,
+      services: rep.services,
+      bankData: rep.bankData,
+      pix: rep.pix,
+      status: rep.status,
+      totalCommissions: rep.commissions.reduce((acc, c) => acc + Number(c.value), 0),
+      commissionsCount: rep._count.commissions,
+      agreementsCount: rep._count.agreements,
+      createdAt: rep.createdAt,
+      user: rep.user,
+    }));
+
     return NextResponse.json({
       success: true,
-      representatives,
+      representatives: formatted,
     });
   } catch (error) {
     console.error('Erro ao buscar representantes:', error);
@@ -87,24 +113,17 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const token = await getToken({ req: request as any });
-    
-    if (!token) {
-      return NextResponse.json(
-        { error: 'Não autenticado' },
-        { status: 401 }
-      );
+    const session = await auth();
+    if (!session) {
+      return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
     }
 
-    if (token.role !== 'ADM Master') {
-      return NextResponse.json(
-        { error: 'Sem permissão para criar representantes' },
-        { status: 403 }
-      );
+    if (session.user.role !== 'ADM Master') {
+      return NextResponse.json({ error: 'Sem permissão' }, { status: 403 });
     }
 
     const body = await request.json();
-    const validatedData = representativeSchema.parse(body);
+    const validatedData = representanteSchema.parse(body);
 
     // Verificar se usuário existe
     const user = await prisma.user.findUnique({
@@ -142,7 +161,6 @@ export async function POST(request: NextRequest) {
         services: validatedData.services,
         bankData: validatedData.bankData,
         pix: validatedData.pix,
-        contractFile: validatedData.contractFile,
         status: validatedData.status,
       },
       include: {
@@ -158,7 +176,7 @@ export async function POST(request: NextRequest) {
 
     await prisma.auditLog.create({
       data: {
-        userId: token.id as string,
+        userId: session.user.id,
         action: 'CREATE',
         module: 'commercial',
         recordId: representative.id,
@@ -179,7 +197,6 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-
     console.error('Erro ao criar representante:', error);
     return NextResponse.json(
       { error: 'Erro ao criar representante' },
