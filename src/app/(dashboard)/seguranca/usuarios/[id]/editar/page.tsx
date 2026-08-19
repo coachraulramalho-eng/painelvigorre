@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { PageHeader } from '@/components/shared/PageHeader';
-import { ArrowLeft, Save, Loader2, UserCog } from 'lucide-react';
+import { ArrowLeft, Save, Loader2, UserCog, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
 
 interface Role {
@@ -62,11 +62,11 @@ export default function EditarUsuarioPage() {
         const userData = await userRes.json();
         setUser(userData);
         setFormData({
-          name: userData.name,
-          email: userData.email,
+          name: userData.name || '',
+          email: userData.email || '',
           password: '',
           confirmPassword: '',
-          active: userData.active,
+          active: userData.active !== undefined ? userData.active : true,
           roleIds: userData.roles?.map((r: any) => r.role?.id || r.id) || [],
         });
       }
@@ -77,6 +77,7 @@ export default function EditarUsuarioPage() {
       }
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
+      setError('Erro ao carregar dados do usuário');
     } finally {
       setLoadingUser(false);
     }
@@ -154,10 +155,11 @@ export default function EditarUsuarioPage() {
     );
   }
 
-  if (!user) {
+  if (error || !user) {
     return (
       <div className="text-center py-12">
-        <p className="text-muted-foreground">Usuário não encontrado</p>
+        <AlertCircle className="h-16 w-16 text-destructive mx-auto mb-4" />
+        <p className="text-muted-foreground">{error || 'Usuário não encontrado'}</p>
         <Button asChild className="mt-4">
           <Link href="/seguranca/usuarios">Voltar</Link>
         </Button>
