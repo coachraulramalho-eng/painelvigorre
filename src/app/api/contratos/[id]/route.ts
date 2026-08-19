@@ -102,25 +102,25 @@ export async function PUT(
       );
     }
 
-    // 🔥 CONVERTER DATAS CORRETAMENTE
-    const updateData: any = { ...validatedData };
-    if (validatedData.value) {
-      updateData.value = parseFloat(validatedData.value);
+    // 🔥 CONSTRUIR OBJETO DE DADOS DINAMICAMENTE
+    const updateData: any = {};
+
+    if (validatedData.proposalId !== undefined) updateData.proposalId = validatedData.proposalId;
+    if (validatedData.companyId !== undefined) updateData.companyId = validatedData.companyId;
+    if (validatedData.title !== undefined) updateData.title = validatedData.title;
+    if (validatedData.value !== undefined) updateData.value = parseFloat(validatedData.value);
+    if (validatedData.status !== undefined) updateData.status = validatedData.status;
+    if (validatedData.notes !== undefined) updateData.notes = validatedData.notes;
+
+    // 🔥 DATAS - SÓ ADICIONAR SE FOREM FORNECIDAS
+    if (validatedData.startDate !== undefined) {
+      updateData.startDate = validatedData.startDate ? new Date(validatedData.startDate) : undefined;
     }
-    if (validatedData.startDate) {
-      updateData.startDate = new Date(validatedData.startDate);
-    } else if (validatedData.startDate === '') {
-      updateData.startDate = null;
+    if (validatedData.endDate !== undefined) {
+      updateData.endDate = validatedData.endDate ? new Date(validatedData.endDate) : undefined;
     }
-    if (validatedData.endDate) {
-      updateData.endDate = new Date(validatedData.endDate);
-    } else if (validatedData.endDate === '') {
-      updateData.endDate = null;
-    }
-    if (validatedData.renewalDate) {
-      updateData.renewalDate = new Date(validatedData.renewalDate);
-    } else if (validatedData.renewalDate === '') {
-      updateData.renewalDate = null;
+    if (validatedData.renewalDate !== undefined) {
+      updateData.renewalDate = validatedData.renewalDate ? new Date(validatedData.renewalDate) : undefined;
     }
 
     const contrato = await prisma.contract.update({
@@ -194,7 +194,6 @@ export async function DELETE(
       );
     }
 
-    // Verificar se tem relacionamentos
     const hasRelations = await prisma.contract.findUnique({
       where: { id },
       include: {
