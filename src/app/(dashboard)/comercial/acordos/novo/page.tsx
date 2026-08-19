@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { PageHeader } from '@/components/shared/PageHeader';
-import { ArrowLeft, Save, Loader2 } from 'lucide-react';
+import { ArrowLeft, Save, Loader2, Handshake } from 'lucide-react';
 import Link from 'next/link';
 
 const STATUS = ['Ativo', 'Encerrado', 'Cancelado'];
@@ -20,6 +20,20 @@ export default function NovoAcordoPage() {
   const [error, setError] = useState<string | null>(null);
   const [representatives, setRepresentatives] = useState([]);
   const [companies, setCompanies] = useState([]);
+  const [loadingData, setLoadingData] = useState(true);
+
+  const [formData, setFormData] = useState({
+    representativeId: '',
+    companyId: '',
+    service: '',
+    percentage: '',
+    fixedValue: '',
+    calculationBase: 'Valor efetivamente recebido',
+    validityStart: '',
+    validityEnd: '',
+    status: 'Ativo',
+    notes: '',
+  });
 
   useEffect(() => {
     loadData();
@@ -43,21 +57,10 @@ export default function NovoAcordoPage() {
       }
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
+    } finally {
+      setLoadingData(false);
     }
   };
-
-  const [formData, setFormData] = useState({
-    representativeId: '',
-    companyId: '',
-    service: '',
-    percentage: '',
-    fixedValue: '',
-    calculationBase: 'Valor efetivamente recebido',
-    validityStart: '',
-    validityEnd: '',
-    status: 'Ativo',
-    notes: '',
-  });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -110,7 +113,10 @@ export default function NovoAcordoPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Informações do Acordo</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <Handshake className="h-5 w-5" />
+            Informações do Acordo
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
@@ -131,11 +137,15 @@ export default function NovoAcordoPage() {
                     <SelectValue placeholder="Selecione um representante" />
                   </SelectTrigger>
                   <SelectContent>
-                    {representatives.map((rep: any) => (
-                      <SelectItem key={rep.id} value={rep.id}>
-                        {rep.user?.name || rep.name}
-                      </SelectItem>
-                    ))}
+                    {loadingData ? (
+                      <SelectItem value="" disabled>Carregando...</SelectItem>
+                    ) : (
+                      representatives.map((rep: any) => (
+                        <SelectItem key={rep.id} value={rep.id}>
+                          {rep.user?.name || rep.name}
+                        </SelectItem>
+                      ))
+                    )}
                   </SelectContent>
                 </Select>
               </div>
@@ -150,6 +160,7 @@ export default function NovoAcordoPage() {
                     <SelectValue placeholder="Selecione um cliente" />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="">Nenhum</SelectItem>
                     {companies.map((company: any) => (
                       <SelectItem key={company.id} value={company.id}>
                         {company.name}
