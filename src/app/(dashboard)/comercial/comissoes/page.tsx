@@ -6,39 +6,52 @@ import { DataTable } from '@/components/shared/DataTable';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
-import { Eye, DollarSign, CheckCircle } from 'lucide-react';
+import { 
+  Eye, 
+  DollarSign,
+  CheckCircle,
+  Clock,
+  TrendingUp,
+  Search,
+  Filter,
+  Loader2
+} from 'lucide-react';
 
-interface Comissao {
+interface Commission {
   id: string;
-  representative: string;
-  proposal: string;
+  representativeId: string;
+  representativeName: string;
+  proposalId: string;
+  proposalNumber: string;
   value: number;
   status: string;
   paymentDate: string;
-}
-
-interface Metrics {
-  totalPendente: number;
-  totalPago: number;
-  totalPrevisto: number;
+  notes: string;
+  createdAt: string;
 }
 
 export default function ComissoesPage() {
-  const [comissoes, setComissoes] = useState<Comissao[]>([]);
+  const [comissoes, setComissoes] = useState<Commission[]>([]);
   const [loading, setLoading] = useState(true);
-  const [metrics, setMetrics] = useState<Metrics>({
+  const [metrics, setMetrics] = useState({
+    totalPrevisto: 0,
     totalPendente: 0,
     totalPago: 0,
-    totalPrevisto: 0,
   });
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
 
   useEffect(() => {
     loadComissoes();
-  }, []);
+  }, [statusFilter]);
 
   const loadComissoes = async () => {
+    setLoading(true);
     try {
-      const response = await fetch('/api/comercial/comissoes');
+      const params = new URLSearchParams();
+      if (statusFilter) params.append('status', statusFilter);
+
+      const response = await fetch(`/api/comercial/comissoes?${params}`);
       if (response.ok) {
         const data = await response.json();
         setComissoes(data.comissoes || []);
@@ -61,6 +74,16 @@ export default function ComissoesPage() {
     return variants[status] || 'secondary';
   };
 
+  const getStatusIcon = (status: string) => {
+    const icons: Record<string, any> = {
+      'Prevista': Clock,
+      'Aprovada': CheckCircle,
+      'Pendente': Clock,
+      'Paga': CheckCircle,
+    };
+    return icons[status] || Clock;
+  };
+
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
@@ -68,29 +91,74 @@ export default function ComissoesPage() {
     }).format(value);
   };
 
+  const handleMarkAsPaid = async (id: string) => {
+    try {
+      const response = await fetch(`/api/comercial/comissoes/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'Paga' }),
+      });
+
+      if (response.ok) {
+        loadComissoes();
+      }
+    } catch (error) {
+      console.error('Erro ao marcar como paga:', error);
+    }
+  };
+
   const columns = [
-    { key: 'representative', label: 'Representante' },
-    { key: 'proposal', label: 'Proposta' },
+    { 
+      key: 'representativeName', 
+      label: 'Representante',
+      render: (value: string) => (
+        <span className="font-medium">{value}</span>
+      )
+    },
+    { 
+      key: 'proposalNumber', 
+      label: 'Proposta',
+      render: (value: string) => (
+        <Badge variant="outline">#{value}</Badge>
+      )
+    },
     { 
       key: 'value', 
-      label: 'Valor', 
-      render: (value: number) => formatCurrency(value) 
+      label: 'Valor',
+      render: (value: number) => (
+        <span className="font-medium">{formatCurrency(value)}</span>
+      )
     },
     { 
       key: 'status', 
-      label: 'Status', 
-      render: (value: string) => (
-        <Badge variant={getStatusBadge(value)}>{value}</Badge>
-      )
+      label: 'Status',
+      render: (value: string) => {
+        const Icon = getStatusIcon(value);
+        return (
+          <Badge variant={getStatusBadge(value)} className="gap-1">
+            <Icon className="h-3 w-3" />
+            {value}
+          </Badge>
+        );
+      }
     },
-    { key: 'paymentDate', label: 'Data Pagamento' },
+    { 
+      key: 'paymentDate', 
+      label: 'Data Pagamento',
+      render: (value: string) => value ? new Date(value).toLocaleDateString('pt-BR') : '-'
+    },
     {
       key: 'actions',
       label: 'Ações',
-      render: (_: any, row: Comissao) => (
+      render: (_: any, row: Commission) => (
         <div className="flex gap-1">
           {row.status === 'Pendente' && (
-            <Button variant="ghost" size="icon" className="h-8 w-8 text-success">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="h-8 w-8 text-success"
+              onClick={() => handleMarkAsPaid(row.id)}
+            >
               <CheckCircle className="h-4 w-4" />
             </Button>
           )}
@@ -116,9 +184,11 @@ export default function ComissoesPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Total Previsto</p>
-                <p className="text-2xl font-bold">{formatCurrency(metrics.totalPrevisto)}</p>
+                <p className="text-2xl font-bold text-blue-600">
+                  {formatCurrency(metrics.totalPrevisto)}
+                </p>
               </div>
-              <DollarSign className="h-8 w-8 text-blue-600" />
+              <TrendingUp className="h-8 w-8 text-blue-600" />
             </div>
           </CardContent>
         </Card>
@@ -128,9 +198,11 @@ export default function ComissoesPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Pendente</p>
-                <p className="text-2xl font-bold text-yellow-600">{formatCurrency(metrics.totalPendente)}</p>
+                <p className="text-2xl font-bold text-yellow-600">
+                  {formatCurrency(metrics.totalPendente)}
+                </p>
               </div>
-              <DollarSign className="h-8 w-8 text-yellow-600" />
+              <Clock className="h-8 w-8 text-yellow-600" />
             </div>
           </CardContent>
         </Card>
@@ -140,7 +212,9 @@ export default function ComissoesPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Pago</p>
-                <p className="text-2xl font-bold text-green-600">{formatCurrency(metrics.totalPago)}</p>
+                <p className="text-2xl font-bold text-green-600">
+                  {formatCurrency(metrics.totalPago)}
+                </p>
               </div>
               <DollarSign className="h-8 w-8 text-green-600" />
             </div>
@@ -148,11 +222,47 @@ export default function ComissoesPage() {
         </Card>
       </div>
 
-      <DataTable
-        columns={columns}
-        data={comissoes}
-        loading={loading}
-      />
+      {/* Filtros */}
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="flex-1 min-w-[200px]">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <input
+              placeholder="Buscar por representante..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary/20"
+            />
+          </div>
+        </div>
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          className="px-4 py-2 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary/20"
+        >
+          <option value="">Todos os Status</option>
+          <option value="Prevista">Prevista</option>
+          <option value="Aprovada">Aprovada</option>
+          <option value="Pendente">Pendente</option>
+          <option value="Paga">Paga</option>
+        </select>
+        <Button variant="outline" className="gap-2" onClick={loadComissoes}>
+          <Filter className="h-4 w-4" />
+          Aplicar Filtros
+        </Button>
+      </div>
+
+      {loading ? (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      ) : (
+        <DataTable
+          columns={columns}
+          data={comissoes}
+          loading={loading}
+        />
+      )}
     </div>
   );
 }
