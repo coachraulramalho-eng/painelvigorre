@@ -38,12 +38,21 @@ export async function GET(
                 id: true,
                 name: true,
                 description: true,
+                isMaster: true,
               },
             },
           },
         },
         representatives: true,
         employees: true,
+        _count: {
+          select: {
+            leadsResponsible: true,
+            proposals: true,
+            tasks: true,
+            contracts: true,
+          },
+        },
       },
     });
 
@@ -103,6 +112,7 @@ export async function PUT(
       );
     }
 
+    // Construir dados de atualização
     const updateData: any = {};
     if (validatedData.name) updateData.name = validatedData.name;
     if (validatedData.email) updateData.email = validatedData.email;
@@ -111,6 +121,7 @@ export async function PUT(
       updateData.password = await hash(validatedData.password, 10);
     }
 
+    // Atualizar usuário
     const user = await prisma.user.update({
       where: { id },
       data: updateData,
@@ -132,11 +143,12 @@ export async function PUT(
       }
     }
 
+    // Registrar auditoria
     await prisma.auditLog.create({
       data: {
         userId: session.user.id,
         action: 'UPDATE',
-        module: 'security',
+        module: 'admin',
         recordId: id,
         oldData: existingUser,
         newData: user,
@@ -230,7 +242,7 @@ export async function DELETE(
       data: {
         userId: session.user.id,
         action: 'DELETE',
-        module: 'security',
+        module: 'admin',
         recordId: id,
         oldData: existingUser,
         ipAddress: request.headers.get('x-forwarded-for') || '',
@@ -293,7 +305,7 @@ export async function PATCH(
       data: {
         userId: session.user.id,
         action: active ? 'ACTIVATE' : 'DEACTIVATE',
-        module: 'security',
+        module: 'admin',
         recordId: id,
         newData: { active },
         ipAddress: request.headers.get('x-forwarded-for') || '',
