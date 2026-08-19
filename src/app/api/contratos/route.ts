@@ -86,15 +86,20 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const validatedData = contratoSchema.parse(body);
 
+    // 🔥 CONVERTER DATAS CORRETAMENTE - USAR null EM VEZ DE undefined
+    const startDate = validatedData.startDate ? new Date(validatedData.startDate) : null;
+    const endDate = validatedData.endDate ? new Date(validatedData.endDate) : null;
+    const renewalDate = validatedData.renewalDate ? new Date(validatedData.renewalDate) : null;
+
     const contrato = await prisma.contract.create({
       data: {
         proposalId: validatedData.proposalId,
         companyId: validatedData.companyId,
         title: validatedData.title,
         value: parseFloat(validatedData.value),
-        startDate: validatedData.startDate ? new Date(validatedData.startDate) : undefined,
-        endDate: validatedData.endDate ? new Date(validatedData.endDate) : undefined,
-        renewalDate: validatedData.renewalDate ? new Date(validatedData.renewalDate) : undefined,
+        startDate: startDate,
+        endDate: endDate,
+        renewalDate: renewalDate,
         status: validatedData.status,
         notes: validatedData.notes,
         responsibleId: session.user.id,
