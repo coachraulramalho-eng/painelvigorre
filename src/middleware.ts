@@ -1,11 +1,10 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { auth } from '@/lib/auth/auth';
 
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
 
-  // 🔥 ROTAS PÚBLICAS - NUNCA BLOQUEAR
+  // 🔥 ROTAS PÚBLICAS
   const publicPaths = [
     '/login',
     '/api/auth',
@@ -27,24 +26,18 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // 🔥 USAR auth() EM VEZ DE getToken() - MAIS CONFIÁVEL
-  try {
-    const session = await auth();
-    console.log('[middleware] Session existe?', !!session);
-    console.log('[middleware] Usuário:', session?.user?.email || 'none');
+  // 🔥 VERIFICAR COOKIE DIRETAMENTE - SEM IMPORTAR auth()
+  const sessionCookie = 
+    request.cookies.get('authjs.session-token')?.value || 
+    request.cookies.get('__Secure-authjs.session-token')?.value;
 
-    if (!session) {
-      const loginUrl = new URL('/login', request.url);
-      loginUrl.searchParams.set('callbackUrl', pathname);
-      return NextResponse.redirect(loginUrl);
-    }
-
-    return NextResponse.next();
-  } catch (error) {
-    console.error('[middleware] Erro:', error);
+  if (!sessionCookie) {
     const loginUrl = new URL('/login', request.url);
+    loginUrl.searchParams.set('callbackUrl', pathname);
     return NextResponse.redirect(loginUrl);
   }
+
+  return NextResponse.next();
 }
 
 export const config = {
