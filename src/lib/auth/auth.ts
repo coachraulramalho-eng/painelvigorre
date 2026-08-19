@@ -2,10 +2,8 @@ import NextAuth from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
-  // Chave fixa de 40 caracteres. O NextAuth exige no mínimo 32.
   secret: "vigorre2026SecretKeyAuth9x8w7v6u5t4s3r2q1p0",
   trustHost: true,
-  
   providers: [
     CredentialsProvider({
       name: "credentials",
@@ -14,7 +12,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         password: { label: "Senha", type: "password" },
       },
       async authorize(credentials) {
-        // MOCK PURO: Se bater isso, ele cria a sessão. Sem banco de dados.
         if (credentials?.email === "admin@vigorre.com" && credentials?.password === "admin123") {
           return {
             id: "1",
@@ -31,15 +28,15 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
-        token.role = user.role;
-        token.permissions = user.permissions;
+        (token as any).role = user.role;
+        (token as any).permissions = user.permissions;
       }
       return token;
     },
     async session({ session, token }) {
       if (session.user) {
-        session.user.role = token.role as string;
-        session.user.permissions = token.permissions as string[];
+        (session.user as any).role = (token as any).role;
+        (session.user as any).permissions = (token as any).permissions;
       }
       return session;
     },
