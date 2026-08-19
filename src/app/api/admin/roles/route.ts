@@ -4,7 +4,7 @@ import { prisma } from '@/lib/db/prisma';
 import { auth } from '@/lib/auth/auth';
 import { z } from 'zod';
 
-const roleSchema = z.object({
+const createRoleSchema = z.object({
   name: z.string().min(2, 'Nome é obrigatório'),
   description: z.string().optional(),
   isMaster: z.boolean().default(false),
@@ -23,7 +23,19 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Sem permissão' }, { status: 403 });
     }
 
+    const { searchParams } = new URL(request.url);
+    const search = searchParams.get('search');
+
+    const where: any = {};
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { description: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+
     const roles = await prisma.role.findMany({
+      where,
       include: {
         users: {
           select: {
@@ -47,7 +59,13 @@ export async function GET(request: NextRequest) {
       isMaster: role.isMaster,
       usersCount: role.users.length,
       permissionsCount: role.permissions.length,
-      permissions: role.permissions.map((p) => p.permission),
+      permissions: role.permissions.map((p) => ({
+        id: p.permission.id,
+        module: p.permission.module,
+        action: p.permission.action,
+        scope: p.permission.scope,
+        description: p.permission.description,
+      })),
       createdAt: role.createdAt,
     }));
 
@@ -73,7 +91,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const validatedData = roleSchema.parse(body);
+    const validatedData = createRoleSchema.parse(body);
 
     // Verificar se já existe
     const existingRole = await prisma.role.findUnique({
@@ -98,11 +116,9 @@ export async function POST(request: NextRequest) {
 
     // Adicionar permissões se existirem
     if (validatedData.permissions && validatedData.permissions.length > 0) {
-      // Buscar ou criar permissões
       for (const perm of validatedData.permissions) {
         const [module, action] = perm.split(':');
         if (module && action) {
-          // Buscar permissão existente
           let permission = await prisma.permission.findFirst({
             where: {
               module,
@@ -111,7 +127,6 @@ export async function POST(request: NextRequest) {
             },
           });
 
-          // Criar se não existir
           if (!permission) {
             permission = await prisma.permission.create({
               data: {
@@ -123,7 +138,6 @@ export async function POST(request: NextRequest) {
             });
           }
 
-          // Vincular ao role
           await prisma.rolePermission.create({
             data: {
               roleId: role.id,
@@ -139,7 +153,7 @@ export async function POST(request: NextRequest) {
       data: {
         userId: session.user.id,
         action: 'CREATE',
-        module: 'security',
+        module: 'admin',
         recordId: role.id,
         newData: role,
         ipAddress: request.headers.get('x-forwarded-for') || '',
