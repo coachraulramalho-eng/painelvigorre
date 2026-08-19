@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -10,13 +10,6 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { ArrowLeft, Save, Loader2 } from 'lucide-react';
 import Link from 'next/link';
-
-interface Permission {
-  id: string;
-  module: string;
-  action: string;
-  description: string;
-}
 
 const MODULES = [
   { id: 'dashboard', label: 'Dashboard', actions: ['view'] },
