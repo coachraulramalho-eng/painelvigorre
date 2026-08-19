@@ -420,6 +420,7 @@ model CommercialAgreement {
   calculationBase String            @map("calculation_base")
   validityStart   DateTime          @map("validity_start")
   validityEnd     DateTime?         @map("validity_end")
+  status          String            @default("Ativo")  // 🔥 ADICIONADO
   notes           String?
   createdAt       DateTime          @default(now()) @map("created_at")
   updatedAt       DateTime          @updatedAt @map("updated_at")
