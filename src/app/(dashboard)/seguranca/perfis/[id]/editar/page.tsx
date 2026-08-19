@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { PageHeader } from '@/components/shared/PageHeader';
-import { ArrowLeft, Save, Loader2, Shield } from 'lucide-react';
+import { ArrowLeft, Save, Loader2, Shield, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
 
 const MODULES = [
@@ -59,13 +59,14 @@ export default function EditarPerfilPage() {
         const data = await response.json();
         setRole(data);
         setFormData({
-          name: data.name,
+          name: data.name || '',
           description: data.description || '',
           permissions: data.permissions?.map((p: any) => `${p.module}:${p.action}`) || [],
         });
       }
     } catch (error) {
       console.error('Erro ao carregar perfil:', error);
+      setError('Erro ao carregar dados do perfil');
     } finally {
       setLoadingRole(false);
     }
@@ -81,6 +82,18 @@ export default function EditarPerfilPage() {
       permissions: prev.permissions.includes(permissionId)
         ? prev.permissions.filter(p => p !== permissionId)
         : [...prev.permissions, permissionId],
+    }));
+  };
+
+  const toggleAllModulePermissions = (moduleId: string, actions: string[]) => {
+    const modulePermissions = actions.map(action => `${moduleId}:${action}`);
+    const allSelected = modulePermissions.every(p => formData.permissions.includes(p));
+
+    setFormData(prev => ({
+      ...prev,
+      permissions: allSelected
+        ? prev.permissions.filter(p => !modulePermissions.includes(p))
+        : [...prev.permissions, ...modulePermissions.filter(p => !prev.permissions.includes(p))],
     }));
   };
 
@@ -122,10 +135,11 @@ export default function EditarPerfilPage() {
     );
   }
 
-  if (!role) {
+  if (error || !role) {
     return (
       <div className="text-center py-12">
-        <p className="text-muted-foreground">Perfil não encontrado</p>
+        <AlertCircle className="h-16 w-16 text-destructive mx-auto mb-4" />
+        <p className="text-muted-foreground">{error || 'Perfil não encontrado'}</p>
         <Button asChild className="mt-4">
           <Link href="/seguranca/perfis">Voltar</Link>
         </Button>
@@ -138,8 +152,9 @@ export default function EditarPerfilPage() {
       <div className="text-center py-12">
         <Shield className="h-16 w-16 text-primary mx-auto mb-4" />
         <h2 className="text-2xl font-bold">Perfil Master</h2>
-        <p className="text-muted-foreground">
-          O perfil Master não pode ser editado.
+        <p className="text-muted-foreground max-w-md mx-auto">
+          O perfil Master possui acesso total ao sistema e não pode ser editado.
+          Para modificar permissões, crie um novo perfil personalizado.
         </p>
         <Button asChild className="mt-4">
           <Link href="/seguranca/perfis">Voltar</Link>
@@ -152,7 +167,7 @@ export default function EditarPerfilPage() {
     <div className="space-y-6">
       <PageHeader
         title={`Editar Perfil: ${role.name}`}
-        description="Atualize as informações do perfil"
+        description="Atualize as informações e permissões do perfil"
         actions={
           <Button variant="outline" asChild>
             <Link href="/seguranca/perfis">
@@ -204,30 +219,65 @@ export default function EditarPerfilPage() {
             </div>
 
             <div className="space-y-4">
-              <Label>Permissões por Módulo</Label>
+              <div className="flex items-center justify-between">
+                <Label>Permissões por Módulo</Label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const allPermissions = MODULES.flatMap(m => 
+                      m.actions.map(a => `${m.id}:${a}`)
+                    );
+                    const allSelected = allPermissions.every(p => formData.permissions.includes(p));
+                    setFormData(prev => ({
+                      ...prev,
+                      permissions: allSelected ? [] : allPermissions,
+                    }));
+                  }}
+                >
+                  {MODULES.flatMap(m => m.actions).every(a => 
+                    formData.permissions.includes(`${MODULES[0]?.id}:${a}`)
+                  ) ? 'Desmarcar Todos' : 'Selecionar Todos'}
+                </Button>
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {MODULES.map((module) => (
-                  <Card key={module.id} className="p-4">
-                    <h4 className="font-medium mb-2">{module.label}</h4>
-                    <div className="space-y-2">
-                      {module.actions.map((action) => (
-                        <div key={`${module.id}-${action}`} className="flex items-center gap-2">
-                          <Checkbox
-                            id={`${module.id}-${action}`}
-                            checked={formData.permissions.includes(`${module.id}:${action}`)}
-                            onCheckedChange={() => togglePermission(`${module.id}:${action}`)}
-                          />
-                          <Label 
-                            htmlFor={`${module.id}-${action}`}
-                            className="text-sm capitalize"
-                          >
-                            {action}
-                          </Label>
-                        </div>
-                      ))}
-                    </div>
-                  </Card>
-                ))}
+                {MODULES.map((module) => {
+                  const modulePermissions = module.actions.map(action => `${module.id}:${action}`);
+                  const allSelected = modulePermissions.every(p => formData.permissions.includes(p));
+                  const someSelected = modulePermissions.some(p => formData.permissions.includes(p));
+
+                  return (
+                    <Card key={module.id} className="p-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className="font-medium">{module.label}</h4>
+                        <Checkbox
+                          checked={allSelected}
+                          onCheckedChange={() => toggleAllModulePermissions(module.id, module.actions)}
+                          className={someSelected && !allSelected ? 'opacity-50' : ''}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        {module.actions.map((action) => (
+                          <div key={`${module.id}-${action}`} className="flex items-center gap-2">
+                            <Checkbox
+                              id={`${module.id}-${action}`}
+                              checked={formData.permissions.includes(`${module.id}:${action}`)}
+                              onCheckedChange={() => togglePermission(`${module.id}:${action}`)}
+                            />
+                            <Label 
+                              htmlFor={`${module.id}-${action}`}
+                              className="text-sm capitalize cursor-pointer"
+                            >
+                              {action}
+                            </Label>
+                          </div>
+                        ))}
+                      </div>
+                    </Card>
+                  );
+                })}
               </div>
             </div>
 
