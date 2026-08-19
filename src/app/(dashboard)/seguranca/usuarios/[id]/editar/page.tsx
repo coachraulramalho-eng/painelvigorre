@@ -1,153 +1,97 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter, useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Checkbox } from '@/components/ui/checkbox';
+import { Badge } from '@/components/ui/badge';
 import { PageHeader } from '@/components/shared/PageHeader';
-import { ArrowLeft, Save, Loader2, UserCog, AlertCircle } from 'lucide-react';
-import Link from 'next/link';
+import { DataTable } from '@/components/shared/DataTable';
+import { 
+  ArrowLeft, 
+  Edit, 
+  User, 
+  Mail, 
+  Calendar,
+  Shield,
+  CheckCircle,
+  XCircle,
+  Loader2,
+  AlertCircle,
+  Lock,
+  Unlock,
+  Activity,
+  FileText,
+  Briefcase,
+  Clock
+} from 'lucide-react';
 
-interface Role {
-  id: string;
-  name: string;
-  description: string;
-  isMaster: boolean;
-}
-
-interface User {
+interface UserData {
   id: string;
   name: string;
   email: string;
   active: boolean;
-  roles: { role: Role }[];
+  lastLoginAt: string;
+  createdAt: string;
+  roles: { role: { id: string; name: string; description: string; isMaster: boolean } }[];
+  _count: {
+    leadsResponsible: number;
+    proposals: number;
+    tasks: number;
+    contracts: number;
+  };
 }
 
-export default function EditarUsuarioPage() {
-  const router = useRouter();
+export default function VisualizarUsuarioPage() {
   const params = useParams();
-  const userId = params.id as string;
+  const router = useRouter();
+  const id = params.id as string;
 
-  const [loading, setLoading] = useState(false);
-  const [loadingUser, setLoadingUser] = useState(true);
+  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState<UserData | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [roles, setRoles] = useState<Role[]>([]);
-  const [user, setUser] = useState<User | null>(null);
-
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    password: '',
-    confirmPassword: '',
-    active: true,
-    roleIds: [] as string[],
-  });
 
   useEffect(() => {
-    loadData();
-  }, [userId]);
+    loadUser();
+  }, [id]);
 
-  const loadData = async () => {
-    setLoadingUser(true);
-    try {
-      const [userRes, rolesRes] = await Promise.all([
-        fetch(`/api/admin/users/${userId}`),
-        fetch('/api/admin/roles'),
-      ]);
-
-      if (userRes.ok) {
-        const userData = await userRes.json();
-        setUser(userData);
-        setFormData({
-          name: userData.name || '',
-          email: userData.email || '',
-          password: '',
-          confirmPassword: '',
-          active: userData.active !== undefined ? userData.active : true,
-          roleIds: userData.roles?.map((r: any) => r.role?.id || r.id) || [],
-        });
-      }
-
-      if (rolesRes.ok) {
-        const rolesData = await rolesRes.json();
-        setRoles(rolesData);
-      }
-    } catch (error) {
-      console.error('Erro ao carregar dados:', error);
-      setError('Erro ao carregar dados do usuário');
-    } finally {
-      setLoadingUser(false);
-    }
-  };
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-  };
-
-  const toggleRole = (roleId: string) => {
-    setFormData(prev => ({
-      ...prev,
-      roleIds: prev.roleIds.includes(roleId)
-        ? prev.roleIds.filter(id => id !== roleId)
-        : [...prev.roleIds, roleId],
-    }));
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const loadUser = async () => {
     setLoading(true);
-    setError(null);
-
-    // Validar senha se foi preenchida
-    if (formData.password || formData.confirmPassword) {
-      if (formData.password !== formData.confirmPassword) {
-        setError('As senhas não coincidem');
-        setLoading(false);
-        return;
-      }
-      if (formData.password.length < 6) {
-        setError('A senha deve ter no mínimo 6 caracteres');
-        setLoading(false);
-        return;
-      }
-    }
-
     try {
-      const payload: any = {
-        name: formData.name,
-        email: formData.email,
-        active: formData.active,
-        roleIds: formData.roleIds,
-      };
-
-      if (formData.password) {
-        payload.password = formData.password;
-      }
-
-      const response = await fetch(`/api/admin/users/${userId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) {
+      const response = await fetch(`/api/admin/users/${id}`);
+      if (response.ok) {
         const data = await response.json();
-        throw new Error(data.error || 'Erro ao atualizar usuário');
+        setUser(data);
+      } else {
+        setError('Usuário não encontrado');
       }
-
-      router.push('/seguranca/usuarios');
-      router.refresh();
     } catch (error) {
-      setError(error instanceof Error ? error.message : 'Erro ao atualizar usuário');
+      console.error('Erro ao carregar usuário:', error);
+      setError('Erro ao carregar dados');
     } finally {
       setLoading(false);
     }
   };
 
-  if (loadingUser) {
+  const toggleUserStatus = async () => {
+    if (!user) return;
+    try {
+      const response = await fetch(`/api/admin/users/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ active: !user.active }),
+      });
+
+      if (response.ok) {
+        loadUser();
+      }
+    } catch (error) {
+      console.error('Erro ao alterar status:', error);
+    }
+  };
+
+  if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -167,156 +111,181 @@ export default function EditarUsuarioPage() {
     );
   }
 
+  const roleColumns = [
+    { 
+      key: 'role', 
+      label: 'Perfil',
+      render: (_: any, row: { role: { name: string; description: string; isMaster: boolean } }) => (
+        <div>
+          <p className="font-medium">{row.role.name}</p>
+          {row.role.isMaster && (
+            <Badge variant="default" className="text-xs">Master</Badge>
+          )}
+          {row.role.description && (
+            <p className="text-xs text-muted-foreground">{row.role.description}</p>
+          )}
+        </div>
+      )
+    },
+  ];
+
+  const activityColumns = [
+    { key: 'type', label: 'Tipo' },
+    { key: 'description', label: 'Descrição' },
+    { key: 'date', label: 'Data' },
+  ];
+
   return (
     <div className="space-y-6">
       <PageHeader
-        title={`Editar Usuário: ${user.name}`}
-        description="Atualize as informações do usuário"
+        title={user.name}
+        description={user.email}
+        badge={user.active ? 'Ativo' : 'Inativo'}
         actions={
-          <Button variant="outline" asChild>
-            <Link href="/seguranca/usuarios">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Voltar
-            </Link>
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" asChild>
+              <Link href="/seguranca/usuarios">
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Voltar
+              </Link>
+            </Button>
+            <Button asChild>
+              <Link href={`/seguranca/usuarios/${id}/editar`}>
+                <Edit className="h-4 w-4 mr-2" />
+                Editar
+              </Link>
+            </Button>
+          </div>
         }
       />
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <UserCog className="h-5 w-5" />
-            Informações do Usuário
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {error && (
-              <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">
-                {error}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Informações Principais */}
+        <Card className="lg:col-span-2">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <User className="h-5 w-5" />
+              Informações Pessoais
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="flex items-start gap-3">
+                <User className="h-5 w-5 text-muted-foreground mt-0.5" />
+                <div>
+                  <p className="text-sm text-muted-foreground">Nome</p>
+                  <p className="font-medium">{user.name}</p>
+                </div>
               </div>
-            )}
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2 col-span-2">
-                <Label htmlFor="name">Nome Completo *</Label>
-                <Input
-                  id="name"
-                  name="name"
-                  value={formData.name}
-                  onChange={handleChange}
-                  required
-                />
+              <div className="flex items-start gap-3">
+                <Mail className="h-5 w-5 text-muted-foreground mt-0.5" />
+                <div>
+                  <p className="text-sm text-muted-foreground">E-mail</p>
+                  <p className="font-medium">{user.email}</p>
+                </div>
               </div>
-
-              <div className="space-y-2 col-span-2">
-                <Label htmlFor="email">E-mail *</Label>
-                <Input
-                  id="email"
-                  name="email"
-                  type="email"
-                  value={formData.email}
-                  onChange={handleChange}
-                  required
-                />
+              <div className="flex items-start gap-3">
+                <Calendar className="h-5 w-5 text-muted-foreground mt-0.5" />
+                <div>
+                  <p className="text-sm text-muted-foreground">Cadastrado em</p>
+                  <p className="font-medium">
+                    {new Date(user.createdAt).toLocaleDateString('pt-BR')}
+                  </p>
+                </div>
               </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="password">Nova Senha</Label>
-                <Input
-                  id="password"
-                  name="password"
-                  type="password"
-                  placeholder="Deixe em branco para manter"
-                  value={formData.password}
-                  onChange={handleChange}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="confirmPassword">Confirmar Nova Senha</Label>
-                <Input
-                  id="confirmPassword"
-                  name="confirmPassword"
-                  type="password"
-                  placeholder="Digite a senha novamente"
-                  value={formData.confirmPassword}
-                  onChange={handleChange}
-                />
-              </div>
-
-              <div className="space-y-2 col-span-2">
-                <div className="flex items-center gap-2">
-                  <Checkbox
-                    id="active"
-                    checked={formData.active}
-                    onCheckedChange={(checked) => 
-                      setFormData({ ...formData, active: checked as boolean })
+              <div className="flex items-start gap-3">
+                <Clock className="h-5 w-5 text-muted-foreground mt-0.5" />
+                <div>
+                  <p className="text-sm text-muted-foreground">Último Login</p>
+                  <p className="font-medium">
+                    {user.lastLoginAt 
+                      ? new Date(user.lastLoginAt).toLocaleString('pt-BR')
+                      : 'Nunca'
                     }
-                  />
-                  <Label htmlFor="active" className="text-sm font-normal">
-                    Usuário ativo
-                  </Label>
+                  </p>
                 </div>
               </div>
             </div>
+          </CardContent>
+        </Card>
 
-            <div className="space-y-4">
-              <Label>Perfis de Acesso</Label>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                {roles.map((role) => (
-                  <div
-                    key={role.id}
-                    className="flex items-center gap-3 p-3 border rounded-lg hover:bg-secondary/50 transition-colors"
-                  >
-                    <Checkbox
-                      id={`role-${role.id}`}
-                      checked={formData.roleIds.includes(role.id)}
-                      onCheckedChange={() => toggleRole(role.id)}
-                      disabled={role.isMaster}
-                    />
-                    <div>
-                      <Label
-                        htmlFor={`role-${role.id}`}
-                        className="font-medium cursor-pointer"
-                      >
-                        {role.name}
-                        {role.isMaster && (
-                          <span className="ml-2 text-xs text-muted-foreground">
-                            (Master)
-                          </span>
-                        )}
-                      </Label>
-                      {role.description && (
-                        <p className="text-xs text-muted-foreground">
-                          {role.description}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                ))}
+        {/* Status */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Status</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between p-3 bg-secondary rounded-lg">
+              <div className="flex items-center gap-3">
+                {user.active ? (
+                  <CheckCircle className="h-8 w-8 text-green-600" />
+                ) : (
+                  <XCircle className="h-8 w-8 text-red-600" />
+                )}
+                <div>
+                  <p className="text-sm text-muted-foreground">Status</p>
+                  <Badge variant={user.active ? 'success' : 'secondary'}>
+                    {user.active ? 'Ativo' : 'Inativo'}
+                  </Badge>
+                </div>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={toggleUserStatus}
+                className="gap-1"
+              >
+                {user.active ? (
+                  <Lock className="h-4 w-4" />
+                ) : (
+                  <Unlock className="h-4 w-4" />
+                )}
+                {user.active ? 'Desativar' : 'Ativar'}
+              </Button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <div className="text-center p-2 bg-secondary rounded-lg">
+                <p className="text-lg font-bold">{user._count.leadsResponsible}</p>
+                <p className="text-xs text-muted-foreground">Leads</p>
+              </div>
+              <div className="text-center p-2 bg-secondary rounded-lg">
+                <p className="text-lg font-bold">{user._count.proposals}</p>
+                <p className="text-xs text-muted-foreground">Propostas</p>
+              </div>
+              <div className="text-center p-2 bg-secondary rounded-lg">
+                <p className="text-lg font-bold">{user._count.tasks}</p>
+                <p className="text-xs text-muted-foreground">Tarefas</p>
+              </div>
+              <div className="text-center p-2 bg-secondary rounded-lg">
+                <p className="text-lg font-bold">{user._count.contracts}</p>
+                <p className="text-xs text-muted-foreground">Contratos</p>
               </div>
             </div>
+          </CardContent>
+        </Card>
+      </div>
 
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" type="button" asChild>
-                <Link href="/seguranca/usuarios">Cancelar</Link>
-              </Button>
-              <Button type="submit" disabled={loading}>
-                {loading ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                    Salvando...
-                  </>
-                ) : (
-                  <>
-                    <Save className="h-4 w-4 mr-2" />
-                    Salvar Alterações
-                  </>
-                )}
-              </Button>
-            </div>
-          </form>
+      {/* Perfis */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Shield className="h-5 w-5" />
+            Perfis de Acesso
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {user.roles && user.roles.length > 0 ? (
+            <DataTable
+              columns={roleColumns}
+              data={user.roles}
+              pageSize={5}
+            />
+          ) : (
+            <p className="text-muted-foreground text-center py-4">
+              Nenhum perfil vinculado
+            </p>
+          )}
         </CardContent>
       </Card>
     </div>
