@@ -2,9 +2,6 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 export function middleware(request: NextRequest) {
-  // Se o código chegou aqui, o 'matcher' abaixo já garantiu que NÃO é uma rota /api ou estática.
-  // Só precisamos checar se é o login ou se tem cookie.
-  
   const pathname = request.nextUrl.pathname;
 
   if (pathname === '/login' || pathname.startsWith('/assinatura')) {
@@ -25,6 +22,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  // O SEGREDO ESTÁ AQUI: O '?!api' impede que este middleware rode em QUALQUER coisa que comece com /api
   matcher: ['/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)'],
 };
