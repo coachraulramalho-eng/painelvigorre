@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { PageHeader } from '@/components/shared/PageHeader';
 import { 
   Download, 
   FileText, 
@@ -19,13 +20,25 @@ import {
   BarChart3,
   PieChart,
   LineChart,
-  ChevronDown
+  ChevronDown,
+  Loader2
 } from 'lucide-react';
+
+interface Report {
+  id: number;
+  name: string;
+  description: string;
+  icon: any;
+  color: string;
+  lastGenerated: string;
+  frequency: string;
+}
 
 export default function RelatoriosPage() {
   const [period, setPeriod] = useState('month');
+  const [loading, setLoading] = useState(false);
 
-  const reports = [
+  const reports: Report[] = [
     {
       id: 1,
       name: 'Relatório de Vendas',
@@ -88,72 +101,98 @@ export default function RelatoriosPage() {
     { name: 'Pipeline - Semana 33', date: '2026-08-15', size: '3.1 MB', status: 'Processando' },
   ];
 
+  const handleExport = (reportName: string) => {
+    setLoading(true);
+    setTimeout(() => {
+      setLoading(false);
+    }, 2000);
+  };
+
   return (
     <div className="space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-primary">Relatórios</h1>
-          <p className="text-muted-foreground">Analise e exporte relatórios gerenciais</p>
-        </div>
-        <div className="flex gap-2">
-          <div className="flex gap-1 bg-secondary rounded-lg p-1">
-            {['week', 'month', 'quarter', 'year'].map((p) => (
-              <Button
-                key={p}
-                variant={period === p ? 'default' : 'ghost'}
-                size="sm"
-                onClick={() => setPeriod(p)}
-              >
-                {p === 'week' ? 'Semana' : p === 'month' ? 'Mês' : p === 'quarter' ? 'Trimestre' : 'Ano'}
-              </Button>
-            ))}
+      <PageHeader
+        title="Relatórios"
+        description="Analise e exporte relatórios gerenciais"
+        actions={
+          <div className="flex gap-2">
+            <div className="flex gap-1 bg-secondary rounded-lg p-1">
+              {['week', 'month', 'quarter', 'year'].map((p) => (
+                <Button
+                  key={p}
+                  variant={period === p ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setPeriod(p)}
+                >
+                  {p === 'week' ? 'Semana' : p === 'month' ? 'Mês' : p === 'quarter' ? 'Trimestre' : 'Ano'}
+                </Button>
+              ))}
+            </div>
+            <Button className="gap-2" onClick={() => handleExport('todos')} disabled={loading}>
+              {loading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Download className="h-4 w-4" />
+              )}
+              Exportar Todos
+            </Button>
           </div>
-          <Button className="gap-2">
-            <Download className="h-4 w-4" />
-            Exportar Todos
-          </Button>
-        </div>
-      </div>
+        }
+      />
 
       {/* Cards de Relatórios */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {reports.map((report) => (
-          <Card key={report.id} className="hover:shadow-lg transition-shadow cursor-pointer">
-            <CardContent className="p-6">
-              <div className="flex items-start justify-between">
-                <div className="flex items-start gap-3">
-                  <div className={`p-2 rounded-lg bg-secondary ${report.color}`}>
-                    <report.icon className="h-5 w-5" />
+        {reports.map((report) => {
+          const Icon = report.icon;
+          return (
+            <Card key={report.id} className="hover:shadow-lg transition-shadow cursor-pointer">
+              <CardContent className="p-6">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-start gap-3">
+                    <div className={`p-2 rounded-lg bg-secondary ${report.color}`}>
+                      <Icon className="h-5 w-5" />
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="font-medium">{report.name}</h4>
+                      <p className="text-sm text-muted-foreground mt-1">{report.description}</p>
+                    </div>
                   </div>
-                  <div className="flex-1">
-                    <h4 className="font-medium">{report.name}</h4>
-                    <p className="text-sm text-muted-foreground mt-1">{report.description}</p>
+                  <Button variant="ghost" size="icon" className="h-8 w-8">
+                    <ChevronDown className="h-4 w-4" />
+                  </Button>
+                </div>
+                <div className="mt-4 flex items-center justify-between text-sm">
+                  <div className="flex items-center gap-2">
+                    <Calendar className="h-3 w-3 text-muted-foreground" />
+                    <span className="text-muted-foreground">Último: {new Date(report.lastGenerated).toLocaleDateString('pt-BR')}</span>
                   </div>
+                  <Badge variant="outline">{report.frequency}</Badge>
                 </div>
-                <Button variant="ghost" size="icon" className="h-8 w-8">
-                  <ChevronDown className="h-4 w-4" />
-                </Button>
-              </div>
-              <div className="mt-4 flex items-center justify-between text-sm">
-                <div className="flex items-center gap-2">
-                  <Calendar className="h-3 w-3 text-muted-foreground" />
-                  <span className="text-muted-foreground">Último: {new Date(report.lastGenerated).toLocaleDateString('pt-BR')}</span>
+                <div className="mt-3 flex gap-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="flex-1 gap-1"
+                    onClick={() => handleExport(report.name)}
+                    disabled={loading}
+                  >
+                    <Eye className="h-3 w-3" />
+                    Visualizar
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="flex-1 gap-1"
+                    onClick={() => handleExport(report.name)}
+                    disabled={loading}
+                  >
+                    <Download className="h-3 w-3" />
+                    Exportar
+                  </Button>
                 </div>
-                <Badge variant="outline">{report.frequency}</Badge>
-              </div>
-              <div className="mt-3 flex gap-2">
-                <Button variant="outline" size="sm" className="flex-1 gap-1">
-                  <Eye className="h-3 w-3" />
-                  Visualizar
-                </Button>
-                <Button variant="outline" size="sm" className="flex-1 gap-1">
-                  <Download className="h-3 w-3" />
-                  Exportar
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
 
       {/* Relatórios Recentes */}
