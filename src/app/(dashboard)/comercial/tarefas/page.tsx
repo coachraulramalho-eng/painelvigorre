@@ -8,8 +8,17 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Plus, Eye, Edit, Trash2, CheckCircle } from 'lucide-react';
 
+interface Tarefa {
+  id: string;
+  title: string;
+  priority: string;
+  status: string;
+  dueDate: string;
+  responsible: string;
+}
+
 export default function TarefasPage() {
-  const [tarefas, setTarefas] = useState([]);
+  const [tarefas, setTarefas] = useState<Tarefa[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -52,18 +61,26 @@ export default function TarefasPage() {
 
   const columns = [
     { key: 'title', label: 'Título' },
-    { key: 'priority', label: 'Prioridade', render: (value) => (
-      <Badge variant={getPriorityBadge(value)}>{value}</Badge>
-    )},
-    { key: 'status', label: 'Status', render: (value) => (
-      <Badge variant={getStatusBadge(value)}>{value}</Badge>
-    )},
+    { 
+      key: 'priority', 
+      label: 'Prioridade', 
+      render: (value: string) => (
+        <Badge variant={getPriorityBadge(value)}>{value}</Badge>
+      )
+    },
+    { 
+      key: 'status', 
+      label: 'Status', 
+      render: (value: string) => (
+        <Badge variant={getStatusBadge(value)}>{value}</Badge>
+      )
+    },
     { key: 'dueDate', label: 'Prazo' },
     { key: 'responsible', label: 'Responsável' },
     {
       key: 'actions',
       label: 'Ações',
-      render: (_, row) => (
+      render: (_: any, row: Tarefa) => (
         <div className="flex gap-1">
           <Button variant="ghost" size="icon" className="h-8 w-8">
             <CheckCircle className="h-4 w-4 text-success" />
