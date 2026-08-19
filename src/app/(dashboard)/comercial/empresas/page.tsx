@@ -7,8 +7,17 @@ import { DataTable } from '@/components/shared/DataTable';
 import { Button } from '@/components/ui/button';
 import { Plus, Eye, Edit, Trash2 } from 'lucide-react';
 
+interface Empresa {
+  id: string;
+  name: string;
+  document: string;
+  phone: string;
+  email: string;
+  segment: string;
+}
+
 export default function EmpresasPage() {
-  const [empresas, setEmpresas] = useState([]);
+  const [empresas, setEmpresas] = useState<Empresa[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -38,7 +47,7 @@ export default function EmpresasPage() {
     {
       key: 'actions',
       label: 'Ações',
-      render: (_, row) => (
+      render: (_: any, row: Empresa) => (
         <div className="flex gap-1">
           <Button variant="ghost" size="icon" className="h-8 w-8">
             <Eye className="h-4 w-4" />
@@ -73,7 +82,6 @@ export default function EmpresasPage() {
         columns={columns}
         data={empresas}
         loading={loading}
-        onSearch={(value) => console.log('Buscar:', value)}
       />
     </div>
   );
