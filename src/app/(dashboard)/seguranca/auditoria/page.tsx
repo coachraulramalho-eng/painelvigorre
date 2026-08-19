@@ -8,6 +8,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { 
   Activity, 
   User, 
+  Users,
   FileText, 
   DollarSign,
   Settings,
