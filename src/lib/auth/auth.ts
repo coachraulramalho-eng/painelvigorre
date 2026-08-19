@@ -1,6 +1,8 @@
 import NextAuth from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 
+console.log("✅ [AUTH] O arquivo auth.ts foi inicializado pelo servidor!");
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
   secret: process.env.NEXTAUTH_SECRET || "vigorre2026SecretKeyAuth9x8w7v6u5t4s3r2q1p0",
   trustHost: true,
@@ -12,7 +14,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         password: { label: "Senha", type: "password" },
       },
       async authorize(credentials) {
+        console.log("✅ [AUTH] Função de login chamada! Email:", credentials?.email);
+        
         if (credentials?.email === "admin@vigorre.com" && credentials?.password === "admin123") {
+          console.log("✅ [AUTH] Login MOCK bem-sucedido!");
           return {
             id: "1",
             name: "Administrador",
@@ -21,6 +26,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             permissions: ["admin:all"],
           };
         }
+        
+        console.log("❌ [AUTH] Credenciais inválidas.");
         return null;
       },
     }),
