@@ -86,24 +86,30 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const validatedData = contratoSchema.parse(body);
 
-    // 🔥 CONVERTER DATAS CORRETAMENTE - USAR null EM VEZ DE undefined
-    const startDate = validatedData.startDate ? new Date(validatedData.startDate) : null;
-    const endDate = validatedData.endDate ? new Date(validatedData.endDate) : null;
-    const renewalDate = validatedData.renewalDate ? new Date(validatedData.renewalDate) : null;
+    // 🔥 CONSTRUIR OBJETO DE DADOS DINAMICAMENTE - SÓ INCLUIR DATAS SE EXISTIREM
+    const data: any = {
+      proposalId: validatedData.proposalId,
+      companyId: validatedData.companyId,
+      title: validatedData.title,
+      value: parseFloat(validatedData.value),
+      status: validatedData.status,
+      notes: validatedData.notes,
+      responsibleId: session.user.id,
+    };
+
+    // 🔥 ADICIONAR DATAS APENAS SE FOREM FORNECIDAS
+    if (validatedData.startDate) {
+      data.startDate = new Date(validatedData.startDate);
+    }
+    if (validatedData.endDate) {
+      data.endDate = new Date(validatedData.endDate);
+    }
+    if (validatedData.renewalDate) {
+      data.renewalDate = new Date(validatedData.renewalDate);
+    }
 
     const contrato = await prisma.contract.create({
-      data: {
-        proposalId: validatedData.proposalId,
-        companyId: validatedData.companyId,
-        title: validatedData.title,
-        value: parseFloat(validatedData.value),
-        startDate: startDate,
-        endDate: endDate,
-        renewalDate: renewalDate,
-        status: validatedData.status,
-        notes: validatedData.notes,
-        responsibleId: session.user.id,
-      },
+      data,
       include: {
         company: {
           select: {
