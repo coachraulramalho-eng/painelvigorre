@@ -1,13 +1,15 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { getToken } from 'next-auth/jwt';
+import { auth } from '@/lib/auth/auth';
 import { prisma } from '@/lib/db/prisma';
 
 export async function GET(request: NextRequest) {
   try {
-    const token = await getToken({ req: request as any });
+    // 🔥 USAR auth() - MAIS CONFIÁVEL QUE getToken()
+    const session = await auth();
     
-    if (!token) {
+    // 🔥 SE NÃO TIVER SESSÃO, RETORNA 401
+    if (!session) {
       return NextResponse.json(
         { error: 'Não autenticado' },
         { status: 401 }
@@ -108,16 +110,16 @@ export async function GET(request: NextRequest) {
     let userProposals = 0;
     let userTasks = 0;
 
-    if (token.role !== 'ADM Master') {
+    if (session.user.role !== 'ADM Master') {
       userLeads = await prisma.lead.count({
-        where: { responsibleId: token.id as string },
+        where: { responsibleId: session.user.id },
       });
       userProposals = await prisma.proposal.count({
-        where: { responsibleId: token.id as string },
+        where: { responsibleId: session.user.id },
       });
       userTasks = await prisma.task.count({
         where: { 
-          responsibleId: token.id as string,
+          responsibleId: session.user.id,
           status: { not: 'Concluída' },
         },
       });
@@ -183,7 +185,7 @@ export async function GET(request: NextRequest) {
           pending: tasksPending,
           overdue: tasksOverdue,
         },
-        user: token.role !== 'ADM Master' ? {
+        user: session.user.role !== 'ADM Master' ? {
           leads: userLeads,
           proposals: userProposals,
           tasks: userTasks,
