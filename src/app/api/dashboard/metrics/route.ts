@@ -1,203 +1,100 @@
 import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/server';
 import { auth } from '@/lib/auth/auth';
 import { prisma } from '@/lib/db/prisma';
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
-    // 🔥 USAR auth() - MAIS CONFIÁVEL QUE getToken()
     const session = await auth();
     
-    // 🔥 SE NÃO TIVER SESSÃO, RETORNA 401
-    if (!session) {
-      return NextResponse.json(
-        { error: 'Não autenticado' },
-        { status: 401 }
-      );
+    // 🔥 Verificação segura: garante que session E session.user existem
+    if (!session || !session.user) {
+      return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
     }
 
-    // ========== COMERCIAL ==========
-    const leadsCount = await prisma.lead.count();
-    const leadsNew = await prisma.lead.count({ where: { status: 'Novo' } });
-    const leadsQualified = await prisma.lead.count({ where: { status: 'Qualificado' } });
-    const leadsConverted = await prisma.lead.count({ where: { status: 'Convertido' } });
+    const userId = session.user.id;
+    const userRole = (session.user as any).role;
 
-    const proposalsTotal = await prisma.proposal.count();
-    const proposalsSent = await prisma.proposal.count({ where: { status: 'Enviada' } });
-    const proposalsNegotiation = await prisma.proposal.count({ 
-      where: { status: { in: ['Em negociação', 'Aguardando decisão'] } } 
-    });
-    const proposalsWon = await prisma.proposal.count({ where: { status: 'Ganha' } });
-    const proposalsLost = await prisma.proposal.count({ where: { status: 'Perdida' } });
+    // 🔥 EXECUÇÃO EM PARALELO (Promise.all): Evita timeout no Vercel
+    const [
+      leadsCount, leadsNew, leadsQualified, leadsConverted,
+      proposalsTotal, proposalsSent, proposalsNegotiation, proposalsWon, proposalsLost,
+      totalReceivable, totalPaid, overdueReceivables,
+      totalPayable, totalPaidExpenses, overduePayables,
+      representativesCount, totalCommissions, pendingCommissions,
+      contractsActive, expiringContracts,
+      tasksPending, tasksOverdue
+    ] = await Promise.all([
+      prisma.lead.count(),
+      prisma.lead.count({ where: { status: 'Novo' } }),
+      prisma.lead.count({ where: { status: 'Qualificado' } }),
+      prisma.lead.count({ where: { status: 'Convertido' } }),
+      prisma.proposal.count(),
+      prisma.proposal.count({ where: { status: 'Enviada' } }),
+      prisma.proposal.count({ where: { status: { in: ['Em negociação', 'Aguardando decisão'] } } }),
+      prisma.proposal.count({ where: { status: 'Ganha' } }),
+      prisma.proposal.count({ where: { status: 'Perdida' } }),
+      prisma.accountReceivable.aggregate({ where: { status: { not: 'Recebido' } }, _sum: { value: true } }),
+      prisma.accountReceivable.aggregate({ where: { status: 'Recebido' }, _sum: { value: true } }),
+      prisma.accountReceivable.count({ where: { status: { not: 'Recebido' }, dueDate: { lt: new Date() } } }),
+      prisma.accountPayable.aggregate({ where: { status: { not: 'Pago' } }, _sum: { value: true } }),
+      prisma.accountPayable.aggregate({ where: { status: 'Pago' }, _sum: { value: true } }),
+      prisma.accountPayable.count({ where: { status: { not: 'Pago' }, dueDate: { lt: new Date() } } }),
+      prisma.representative.count({ where: { status: 'Ativo' } }),
+      prisma.commission.aggregate({ _sum: { value: true } }),
+      prisma.commission.count({ where: { status: 'Pendente' } }),
+      prisma.contract.count({ where: { status: 'Ativo' } }),
+      prisma.contract.count({ where: { status: 'Ativo', endDate: { lte: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), gte: new Date() } } }),
+      prisma.task.count({ where: { status: { not: 'Concluída' } } }),
+      prisma.task.count({ where: { status: { not: 'Concluída' }, dueDate: { lt: new Date() } } }),
+    ]);
 
-    // ========== FINANCEIRO ==========
-    const totalReceivable = await prisma.accountReceivable.aggregate({
-      where: { status: { not: 'Recebido' } },
-      _sum: { value: true },
-    });
+    let userLeads = 0, userProposals = 0, userTasks = 0;
 
-    const totalPaid = await prisma.accountReceivable.aggregate({
-      where: { status: 'Recebido' },
-      _sum: { value: true },
-    });
-
-    const overdueReceivables = await prisma.accountReceivable.count({
-      where: {
-        status: { not: 'Recebido' },
-        dueDate: { lt: new Date() },
-      },
-    });
-
-    const totalPayable = await prisma.accountPayable.aggregate({
-      where: { status: { not: 'Pago' } },
-      _sum: { value: true },
-    });
-
-    const totalPaidExpenses = await prisma.accountPayable.aggregate({
-      where: { status: 'Pago' },
-      _sum: { value: true },
-    });
-
-    const overduePayables = await prisma.accountPayable.count({
-      where: {
-        status: { not: 'Pago' },
-        dueDate: { lt: new Date() },
-      },
-    });
-
-    // ========== REPRESENTANTES ==========
-    const representativesCount = await prisma.representative.count({
-      where: { status: 'Ativo' },
-    });
-
-    const totalCommissions = await prisma.commission.aggregate({
-      _sum: { value: true },
-    });
-
-    const pendingCommissions = await prisma.commission.count({
-      where: { status: 'Pendente' },
-    });
-
-    // ========== CONTRATOS ==========
-    const contractsActive = await prisma.contract.count({
-      where: { status: 'Ativo' },
-    });
-
-    const expiringContracts = await prisma.contract.count({
-      where: {
-        status: 'Ativo',
-        endDate: {
-          lte: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-          gte: new Date(),
-        },
-      },
-    });
-
-    // ========== TAREFAS ==========
-    const tasksPending = await prisma.task.count({
-      where: { status: { not: 'Concluída' } },
-    });
-
-    const tasksOverdue = await prisma.task.count({
-      where: {
-        status: { not: 'Concluída' },
-        dueDate: { lt: new Date() },
-      },
-    });
-
-    // ========== DASHBOARD DO USUÁRIO ==========
-    let userLeads = 0;
-    let userProposals = 0;
-    let userTasks = 0;
-
-    if (session.user.role !== 'ADM Master') {
-      userLeads = await prisma.lead.count({
-        where: { responsibleId: session.user.id },
-      });
-      userProposals = await prisma.proposal.count({
-        where: { responsibleId: session.user.id },
-      });
-      userTasks = await prisma.task.count({
-        where: { 
-          responsibleId: session.user.id,
-          status: { not: 'Concluída' },
-        },
-      });
+    if (userRole !== 'ADM Master' && userId) {
+      const [uLeads, uProposals, uTasks] = await Promise.all([
+        prisma.lead.count({ where: { responsibleId: userId } }),
+        prisma.proposal.count({ where: { responsibleId: userId } }),
+        prisma.task.count({ where: { responsibleId: userId, status: { not: 'Concluída' } } }),
+      ]);
+      userLeads = uLeads;
+      userProposals = uProposals;
+      userTasks = uTasks;
     }
 
-    // Converter valores do Prisma Decimal para number
     const totalPaidValue = Number(totalPaid._sum.value) || 0;
     const totalPaidExpensesValue = Number(totalPaidExpenses._sum.value) || 0;
     const totalReceivableValue = Number(totalReceivable._sum.value) || 0;
     const totalPayableValue = Number(totalPayable._sum.value) || 0;
     const totalCommissionsValue = Number(totalCommissions._sum.value) || 0;
-
     const result = totalPaidValue - totalPaidExpensesValue;
 
     return NextResponse.json({
       success: true,
       metrics: {
         commercial: {
-          leads: {
-            total: leadsCount,
-            new: leadsNew,
-            qualified: leadsQualified,
-            converted: leadsConverted,
-          },
+          leads: { total: leadsCount, new: leadsNew, qualified: leadsQualified, converted: leadsConverted },
           proposals: {
-            total: proposalsTotal,
-            sent: proposalsSent,
-            negotiation: proposalsNegotiation,
-            won: proposalsWon,
-            lost: proposalsLost,
-            conversionRate: proposalsTotal > 0 
-              ? Math.round((proposalsWon / proposalsTotal) * 100) 
-              : 0,
+            total: proposalsTotal, sent: proposalsSent, negotiation: proposalsNegotiation,
+            won: proposalsWon, lost: proposalsLost,
+            conversionRate: proposalsTotal > 0 ? Math.round((proposalsWon / proposalsTotal) * 100) : 0,
           },
         },
         financial: {
-          receivable: {
-            total: totalReceivableValue,
-            overdue: overdueReceivables,
-          },
-          paid: {
-            total: totalPaidValue,
-          },
-          payable: {
-            total: totalPayableValue,
-            overdue: overduePayables,
-          },
-          expenses: {
-            total: totalPaidExpensesValue,
-          },
+          receivable: { total: totalReceivableValue, overdue: overdueReceivables },
+          paid: { total: totalPaidValue },
+          payable: { total: totalPayableValue, overdue: overduePayables },
+          expenses: { total: totalPaidExpensesValue },
           result: result,
         },
-        representatives: {
-          total: representativesCount,
-          totalCommissions: totalCommissionsValue,
-          pendingCommissions,
-        },
-        contracts: {
-          active: contractsActive,
-          expiring: expiringContracts,
-        },
-        tasks: {
-          pending: tasksPending,
-          overdue: tasksOverdue,
-        },
-        user: session.user.role !== 'ADM Master' ? {
-          leads: userLeads,
-          proposals: userProposals,
-          tasks: userTasks,
-        } : null,
+        representatives: { total: representativesCount, totalCommissions: totalCommissionsValue, pendingCommissions },
+        contracts: { active: contractsActive, expiring: expiringContracts },
+        tasks: { pending: tasksPending, overdue: tasksOverdue },
+        user: userRole !== 'ADM Master' ? { leads: userLeads, proposals: userProposals, tasks: userTasks } : null,
       },
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
-    console.error('Erro ao buscar métricas:', error);
-    return NextResponse.json(
-      { error: 'Erro ao buscar métricas' },
-      { status: 500 }
-    );
+    console.error('💥 [API METRICS] Erro crítico:', error);
+    return NextResponse.json({ error: 'Erro interno ao buscar métricas' }, { status: 500 });
   }
 }
