@@ -76,7 +76,6 @@ export default function DashboardPage() {
       });
 
       if (response.status === 401) {
-        // Se não autenticado, recarregar a página
         window.location.reload();
         return;
       }
@@ -107,7 +106,6 @@ export default function DashboardPage() {
     return new Intl.NumberFormat('pt-BR').format(value);
   };
 
-  // 🔥 MOSTRAR LOADING ENQUANTO A SESSÃO CARREGA
   if (status === 'loading' || loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -152,7 +150,9 @@ export default function DashboardPage() {
     );
   }
 
-  const isMaster = session?.user?.role === 'ADM Master';
+  // 🔥 CORREÇÃO DE TIPO SEGURA: Diz ao TypeScript que 'role' e 'name' existem
+  const user = session?.user as { role?: string; name?: string; id?: string } | undefined;
+  const isMaster = user?.role === 'ADM Master';
 
   return (
     <div className="space-y-6">
@@ -165,12 +165,12 @@ export default function DashboardPage() {
           <p className="text-muted-foreground">
             {isMaster 
               ? 'Visão completa da empresa' 
-              : `Bem-vindo, ${session?.user?.name || 'Usuário'}`
+              : `Bem-vindo, ${user?.name || 'Usuário'}`
             }
           </p>
         </div>
         <Badge variant="outline" className="px-4 py-2">
-          {session?.user?.role || 'Funcionário'}
+          {user?.role || 'Funcionário'}
         </Badge>
       </div>
 
