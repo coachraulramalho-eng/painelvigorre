@@ -17,7 +17,7 @@ const PUBLIC_PATHS = [
   '/assinatura',
 ];
 
-// 🔥 ROTAS DE API QUE NÃO PRECISAM DE AUTENTICAÇÃO (PÚBLICAS)
+// 🔥 ROTAS DE API PÚBLICAS
 const PUBLIC_API_PATHS = [
   '/api/qrcode',
   '/api/signature',
@@ -41,30 +41,14 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // 🔥 ESPECIAL: Permitir todas as APIs do dashboard
-  if (pathname.startsWith('/api/dashboard/')) {
-    // Verifica se tem cookie de sessão
-    const sessionCookie = 
-      request.cookies.get('authjs.session-token')?.value || 
-      request.cookies.get('__Secure-authjs.session-token')?.value;
-
-    if (!sessionCookie) {
-      return NextResponse.json(
-        { error: 'Não autenticado' },
-        { status: 401 }
-      );
-    }
-    return NextResponse.next();
-  }
-
-  // 3. Verificar cookie de sessão (mais leve que getToken)
+  // 3. Verificar cookie de sessão
   const sessionCookie = 
     request.cookies.get('authjs.session-token')?.value || 
     request.cookies.get('__Secure-authjs.session-token')?.value;
 
-  // Se não tem cookie, redirecionar para login
+  // Se não tem cookie
   if (!sessionCookie) {
-    // Se for uma API, retornar 401 em vez de redirecionar
+    // Se for uma API, retornar 401
     if (pathname.startsWith('/api/')) {
       return NextResponse.json(
         { error: 'Não autenticado' },
@@ -72,6 +56,7 @@ export function middleware(request: NextRequest) {
       );
     }
     
+    // Se for página, redirecionar para login
     const loginUrl = new URL('/login', request.url);
     loginUrl.searchParams.set('callbackUrl', pathname);
     return NextResponse.redirect(loginUrl);
