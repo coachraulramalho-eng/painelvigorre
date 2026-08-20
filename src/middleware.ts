@@ -41,8 +41,7 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // 🔥 PERMITIR DASHBOARD TEMPORARIAMENTE (PARA TESTE)
-  // REMOVER DEPOIS QUE O COOKIE FOR RESOLVIDO
+  // 🔥 PERMITIR DASHBOARD E APIs DE MÉTRICAS (TEMPORÁRIO)
   if (pathname.startsWith('/api/dashboard/')) {
     return NextResponse.next();
   }
@@ -54,7 +53,7 @@ export function middleware(request: NextRequest) {
     request.cookies.get('next-auth.session-token')?.value ||
     request.cookies.get('__Secure-next-auth.session-token')?.value;
 
-  // Se não tem cookie
+  // 4. Se não tem cookie, redirecionar para login ou retornar 401
   if (!sessionCookie) {
     // Se for API, retornar 401
     if (pathname.startsWith('/api/')) {
