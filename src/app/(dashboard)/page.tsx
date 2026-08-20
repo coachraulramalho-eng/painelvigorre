@@ -52,24 +52,44 @@ interface DashboardMetrics {
 }
 
 export default function DashboardPage() {
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    loadMetrics();
-  }, []);
+    if (status === 'authenticated') {
+      loadMetrics();
+    }
+  }, [status]);
 
   const loadMetrics = async () => {
     try {
-      const response = await fetch('/api/dashboard/metrics');
-      if (!response.ok) {
-        throw new Error('Erro ao carregar métricas');
+      setLoading(true);
+      setError(null);
+      
+      const response = await fetch('/api/dashboard/metrics', {
+        credentials: 'include',
+        headers: {
+          'Cache-Control': 'no-cache',
+        },
+      });
+
+      if (response.status === 401) {
+        // Se não autenticado, recarregar a página
+        window.location.reload();
+        return;
       }
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Erro ao carregar métricas');
+      }
+
       const data = await response.json();
       setMetrics(data.metrics);
     } catch (error) {
+      console.error('Erro ao carregar métricas:', error);
       setError(error instanceof Error ? error.message : 'Erro ao carregar dados');
     } finally {
       setLoading(false);
@@ -87,10 +107,23 @@ export default function DashboardPage() {
     return new Intl.NumberFormat('pt-BR').format(value);
   };
 
-  if (loading) {
+  // 🔥 MOSTRAR LOADING ENQUANTO A SESSÃO CARREGA
+  if (status === 'loading' || loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (status === 'unauthenticated') {
+    return (
+      <div className="text-center py-12">
+        <AlertCircle className="h-12 w-12 text-yellow-500 mx-auto mb-4" />
+        <p className="text-muted-foreground">Você não está autenticado</p>
+        <Button asChild className="mt-4">
+          <Link href="/login">Fazer Login</Link>
+        </Button>
       </div>
     );
   }
@@ -108,7 +141,15 @@ export default function DashboardPage() {
   }
 
   if (!metrics) {
-    return null;
+    return (
+      <div className="text-center py-12">
+        <Activity className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+        <p className="text-muted-foreground">Nenhuma métrica disponível</p>
+        <Button onClick={loadMetrics} className="mt-4">
+          Carregar dados
+        </Button>
+      </div>
+    );
   }
 
   const isMaster = session?.user?.role === 'ADM Master';
