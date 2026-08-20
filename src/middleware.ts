@@ -17,7 +17,7 @@ const PUBLIC_PATHS = [
   '/assinatura',
 ];
 
-// 🔥 ROTAS DE API PÚBLICAS
+// 🔥 ROTAS DE API QUE NÃO PRECISAM DE AUTENTICAÇÃO
 const PUBLIC_API_PATHS = [
   '/api/qrcode',
   '/api/signature',
@@ -26,6 +26,9 @@ const PUBLIC_API_PATHS = [
 
 export function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
+
+  // 🔥 LOG PARA DEPURAÇÃO (remover depois)
+  console.log('[middleware] Path:', pathname);
 
   // 1. Verificar se é rota pública
   const isPublicPath = PUBLIC_PATHS.some(
@@ -41,15 +44,20 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // 3. Verificar cookie de sessão
+  // 3. 🔥 VERIFICAR COOKIE DE SESSÃO - VÁRIOS FORMATOS
   const sessionCookie = 
     request.cookies.get('authjs.session-token')?.value || 
-    request.cookies.get('__Secure-authjs.session-token')?.value;
+    request.cookies.get('__Secure-authjs.session-token')?.value ||
+    request.cookies.get('next-auth.session-token')?.value ||
+    request.cookies.get('__Secure-next-auth.session-token')?.value;
+
+  console.log('[middleware] Session cookie existe?', !!sessionCookie);
 
   // Se não tem cookie
   if (!sessionCookie) {
-    // Se for uma API, retornar 401
+    // Se for API, retornar 401
     if (pathname.startsWith('/api/')) {
+      console.log('[middleware] API sem autenticação, retornando 401');
       return NextResponse.json(
         { error: 'Não autenticado' },
         { status: 401 }
