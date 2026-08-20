@@ -17,7 +17,7 @@ const PUBLIC_PATHS = [
   '/assinatura',
 ];
 
-// 🔥 ROTAS DE API PÚBLICAS
+// 🔥 ROTAS DE API QUE NÃO PRECISAM DE AUTENTICAÇÃO
 const PUBLIC_API_PATHS = [
   '/api/qrcode',
   '/api/signature',
@@ -41,20 +41,18 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // 🔥 PERMITIR DASHBOARD TEMPORARIAMENTE (PARA TESTE)
+  // REMOVER DEPOIS QUE O COOKIE FOR RESOLVIDO
+  if (pathname.startsWith('/api/dashboard/')) {
+    return NextResponse.next();
+  }
+
   // 3. 🔥 VERIFICAR TODOS OS POSSÍVEIS NOMES DE COOKIE
   const sessionCookie = 
     request.cookies.get('authjs.session-token')?.value || 
     request.cookies.get('__Secure-authjs.session-token')?.value ||
     request.cookies.get('next-auth.session-token')?.value ||
     request.cookies.get('__Secure-next-auth.session-token')?.value;
-
-  // 4. 🔥 PERMITIR TODAS AS APIS DO DASHBOARD MESMO SEM COOKIE (TEMPORÁRIO)
-  // Isso vai permitir o dashboard carregar enquanto debugamos
-  if (pathname.startsWith('/api/dashboard/')) {
-    // Tenta verificar o cookie, mas se não tiver, ainda assim libera (temporário)
-    // 🔥 REMOVER ESTA LINHA DEPOIS DE RESOLVER
-    return NextResponse.next();
-  }
 
   // Se não tem cookie
   if (!sessionCookie) {
