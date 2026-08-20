@@ -15,6 +15,7 @@ const PUBLIC_PATHS = [
   '/logo.svg',
   '/media',
   '/assinatura',
+  '/api/dashboard', // 🔥 ADICIONADO PARA PERMITIR DASHBOARD
 ];
 
 // 🔥 ROTAS DE API QUE NÃO PRECISAM DE AUTENTICAÇÃO
@@ -41,19 +42,14 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // 🔥 PERMITIR DASHBOARD E APIs DE MÉTRICAS (TEMPORÁRIO)
-  if (pathname.startsWith('/api/dashboard/')) {
-    return NextResponse.next();
-  }
-
-  // 3. 🔥 VERIFICAR TODOS OS POSSÍVEIS NOMES DE COOKIE
+  // 3. Verificar cookie de sessão
   const sessionCookie = 
     request.cookies.get('authjs.session-token')?.value || 
     request.cookies.get('__Secure-authjs.session-token')?.value ||
     request.cookies.get('next-auth.session-token')?.value ||
     request.cookies.get('__Secure-next-auth.session-token')?.value;
 
-  // 4. Se não tem cookie, redirecionar para login ou retornar 401
+  // Se não tem cookie
   if (!sessionCookie) {
     // Se for API, retornar 401
     if (pathname.startsWith('/api/')) {
